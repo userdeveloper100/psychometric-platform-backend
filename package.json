@@ -1,30 +1,43 @@
 {
-  "name": "backend",
+  "name": "psychometric-platform-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A SaaS Psychometric Testing Platform backend built with Node.js, Express, TypeScript, and Prisma.",
+  "main": "src/server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@prisma/client": "^7.5.0",
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "prisma": "^7.5.0",
-    "zod": "^4.3.6"
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "@prisma/client": "^6.0.0"
   },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.4.0",
-    "nodemon": "^3.1.14",
+    "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.12.7",
+    "prisma": "^6.0.0",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
-  }
+  },
+  "keywords": [
+    "SaaS",
+    "psychometric",
+    "testing",
+    "platform",
+    "backend",
+    "Node.js",
+    "Express",
+    "TypeScript",
+    "Prisma"
+  ],
+  "author": "userdeveloper100",
+  "license": "MIT"
 }
