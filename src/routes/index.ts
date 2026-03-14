@@ -7,7 +7,7 @@ import responseRoutes from '../modules/responses/response.routes';
 import studentRoutes from '../modules/students/student.routes';
 import testRoutes from '../modules/tests/test.routes';
 import { Router } from 'express';
-
+import inviteRoutes from '../modules/invites/invite.routes';
 
 const router = Router();
 
@@ -19,6 +19,7 @@ router.use('/questions', questionRoutes);
 router.use('/students', studentRoutes);
 router.use('/responses', responseRoutes);
 router.use('/reports', reportRoutes);
+router.use('/invites', inviteRoutes);
 
 // Health check
 router.get('/health', (req, res) => res.json({ status: 'ok' }));

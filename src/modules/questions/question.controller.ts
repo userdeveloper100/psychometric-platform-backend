@@ -1,12 +1,90 @@
 import { Request, Response } from 'express';
 import * as questionService from './question.service';
 
-export const createQuestion = async (req: Request, res: Response) => {
+export const createQuestion = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
     try {
         const { dimensionId } = req.params;
-        const question = await questionService.createQuestion(dimensionId, req.body);
-        res.status(201).json(question);
+        const { text, scaleMin, scaleMax } = req.body;
+
+        if (!dimensionId) {
+            res.status(400).json({ success: false, message: 'dimensionId is required' });
+            return;
+        }
+
+        if (!text || typeof text !== 'string') {
+            res.status(400).json({ success: false, message: 'text is required' });
+            return;
+        }
+
+        const question = await questionService.createQuestion(dimensionId, {
+            text,
+            scaleMin,
+            scaleMax
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Question created successfully',
+            data: question
+        });
     } catch (err: any) {
-        res.status(400).json({ message: err.message });
+        const message = err?.message || 'Failed to create question';
+        const status = message === 'Dimension not found' ? 404 : 400;
+        res.status(status).json({ success: false, message });
+    }
+};
+
+export const getDimensionQuestions = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const { dimensionId } = req.params;
+
+        if (!dimensionId) {
+            res.status(400).json({ success: false, message: 'dimensionId is required' });
+            return;
+        }
+
+        const questions = await questionService.getDimensionQuestions(dimensionId);
+
+        res.status(200).json({
+            success: true,
+            message: 'Questions fetched successfully',
+            data: questions
+        });
+    } catch (err: any) {
+        const message = err?.message || 'Failed to fetch questions';
+        const status = message === 'Dimension not found' ? 404 : 500;
+        res.status(status).json({ success: false, message });
+    }
+};
+
+export const deleteQuestion = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            res.status(400).json({ success: false, message: 'question id is required' });
+            return;
+        }
+
+        const deleted = await questionService.deleteQuestion(id);
+
+        res.status(200).json({
+            success: true,
+            message: 'Question deleted successfully',
+            data: deleted
+        });
+    } catch (err: any) {
+        const message = err?.message || 'Failed to delete question';
+        const status = message === 'Question not found' ? 404 : 400;
+        res.status(status).json({ success: false, message });
     }
 };

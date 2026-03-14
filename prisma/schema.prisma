@@ -14,77 +14,123 @@ model Institute {
   users     User[]
   students  Student[]
   tests     PsychometricTest[]
+
+  createdBy String?
   createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
+  id          String    @id @default(uuid())
+  email       String    @unique
   password    String
   role        Role
   instituteId String
   institute   Institute @relation(fields: [instituteId], references: [id])
-  createdAt   DateTime  @default(now())
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model PsychometricTest {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
   description String?
-  status      TestStatus @default(DRAFT)
+  status      TestStatus   @default(DRAFT)
   instituteId String
-  institute   Institute @relation(fields: [instituteId], references: [id])
+  institute   Institute    @relation(fields: [instituteId], references: [id])
   dimensions  Dimension[]
   invites     TestInvite[]
-  createdAt   DateTime @default(now())
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model Dimension {
-  id       String @id @default(uuid())
-  name     String
-  testId   String
-  test     PsychometricTest @relation(fields: [testId], references: [id])
+  id        String           @id @default(uuid())
+  name      String
+  testId    String
+  test      PsychometricTest @relation(fields: [testId], references: [id])
   questions Question[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model Question {
-  id          String @id @default(uuid())
+  id          String    @id @default(uuid())
   text        String
   dimensionId String
   dimension   Dimension @relation(fields: [dimensionId], references: [id])
   scaleMin    Int
   scaleMax    Int
   responses   Response[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model Student {
-  id          String @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   email       String
   instituteId String
   institute   Institute @relation(fields: [instituteId], references: [id])
   invites     TestInvite[]
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
 }
 
+
 model TestInvite {
-  id        String @id @default(uuid())
+  id        String       @id @default(uuid())
   testId    String
   studentId String
-  token     String @unique
+  token     String       @unique
   status    InviteStatus @default(PENDING)
 
-  test      PsychometricTest @relation(fields: [testId], references: [id])
-  student   Student @relation(fields: [studentId], references: [id])
+  test    PsychometricTest @relation(fields: [testId], references: [id])
+  student Student         @relation(fields: [studentId], references: [id])
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 model Response {
-  id         String @id @default(uuid())
+  id         String   @id @default(uuid())
   questionId String
   studentId  String
   answer     Int
-  createdAt  DateTime @default(now())
 
   question Question @relation(fields: [questionId], references: [id])
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
 }
 
 enum Role {

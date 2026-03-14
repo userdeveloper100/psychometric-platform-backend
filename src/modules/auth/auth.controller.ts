@@ -1,10 +1,34 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
 
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response): Promise<void> => {
     try {
-        const user = await authService.register(req.body);
-        res.status(201).json(user);
+        const { instituteName, email, password } = req.body;
+
+        // Validate required fields
+        if (!instituteName || !email || !password) {
+            res.status(400).json({
+                success: false,
+                message: 'instituteName, email and password are required'
+            });
+            return;
+        }
+
+        // Call registerInstituteAdmin from auth service
+        const result = await authService.registerInstituteAdmin({
+            instituteName,
+            email,
+            password
+        });
+
+        // Return token and user info
+        res.status(201).json({
+            success: true,
+            message: 'Institute admin registered successfully',
+            data: {
+                token: result.token,
+            }
+        });
     } catch (err: any) {
         res.status(400).json({ message: err.message });
     }
