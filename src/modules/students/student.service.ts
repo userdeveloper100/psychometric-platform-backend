@@ -15,6 +15,75 @@ interface GetStudentsOptions {
     search?: string;
 }
 
+<<<<<<< HEAD
+interface GetAllStudentsOptions {
+    page?: number;
+    limit?: number;
+}
+
+// ─── Get Students (Paginated) ─────────────────────────────────────────────────
+
+export async function getStudents(
+    instituteId: string,
+    { page = 1, limit = 10, search = '' }: GetStudentsOptions = {}
+) {
+    logger.info('Fetching students', { instituteId, page, limit });
+    try {
+        const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const skip = (page - 1) * safeLimit;
+
+        const where: Prisma.StudentWhereInput = {
+            instituteId,
+            isActive: true,
+            ...(search && {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { email: { contains: search, mode: 'insensitive' } }
+                ]
+            })
+        };
+
+        const [total, students] = await prisma.$transaction([
+            prisma.student.count({ where }),
+            prisma.student.findMany({
+                where,
+                skip,
+                take: safeLimit,
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    instituteId: true,
+                    createdAt: true
+                }
+            })
+        ]);
+
+        const totalPages = Math.ceil(total / safeLimit);
+
+        logger.info('Students fetched', { instituteId, total });
+        return {
+            data: students,
+            meta: {
+                total,
+                page,
+                limit: safeLimit,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1
+            }
+        };
+    } catch (error) {
+        logger.error('Failed to fetch students', {
+            error: error instanceof Error ? error.message : error
+        });
+        throw new Error('Failed to fetch students');
+    }
+}
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Create Student ───────────────────────────────────────────────────────────
 
 export async function createStudent(
@@ -129,6 +198,8 @@ export async function bulkUploadStudents(
     }
 }
 
+<<<<<<< HEAD
+=======
 // ─── Get Students (Paginated) ─────────────────────────────────────────────────
 
 export async function getStudents(
@@ -190,6 +261,7 @@ export async function getStudents(
     }
 }
 
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Soft Delete Student ──────────────────────────────────────────────────────
 
 export async function deleteStudent(

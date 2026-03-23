@@ -8,12 +8,22 @@ datasource db {
 }
 
 model Institute {
+<<<<<<< HEAD
+  id    String @id @default(uuid())
+  name  String
+  email String
+
+  users    User[]
+  students Student[]
+  tests    PsychometricTest[]
+=======
   id        String   @id @default(uuid())
   name      String
   email     String
   users     User[]
   students  Student[]
   tests     PsychometricTest[]
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
@@ -23,10 +33,18 @@ model Institute {
 }
 
 model User {
+<<<<<<< HEAD
+  id       String @id @default(uuid())
+  email    String @unique
+  password String
+  role     Role
+
+=======
   id          String    @id @default(uuid())
   email       String    @unique
   password    String
   role        Role
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
   instituteId String
   institute   Institute @relation(fields: [instituteId], references: [id])
 
@@ -35,6 +53,23 @@ model User {
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@index([instituteId])
+}
+
+model PsychometricTest {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TestStatus @default(DRAFT)
+
+  instituteId String
+  institute   Institute @relation(fields: [instituteId], references: [id])
+
+  dimensions Dimension[]
+  invites    TestInvite[]
+=======
 }
 
 model PsychometricTest {
@@ -46,12 +81,26 @@ model PsychometricTest {
   institute   Institute    @relation(fields: [instituteId], references: [id])
   dimensions  Dimension[]
   invites     TestInvite[]
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@index([instituteId])
+}
+
+model Dimension {
+  id   String @id @default(uuid())
+  name String
+
+  testId String
+  test   PsychometricTest @relation(fields: [testId], references: [id])
+
+=======
 }
 
 model Dimension {
@@ -59,6 +108,7 @@ model Dimension {
   name      String
   testId    String
   test      PsychometricTest @relation(fields: [testId], references: [id])
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
   questions Question[]
 
   createdBy String?
@@ -66,6 +116,23 @@ model Dimension {
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@index([testId])
+}
+
+model Question {
+  id   String @id @default(uuid())
+  text String
+
+  dimensionId String
+  dimension   Dimension @relation(fields: [dimensionId], references: [id])
+
+  scaleMin Int
+  scaleMax Int
+
+  responses Response[]
+=======
 }
 
 model Question {
@@ -76,12 +143,29 @@ model Question {
   scaleMin    Int
   scaleMax    Int
   responses   Response[]
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@index([dimensionId])
+}
+
+model Student {
+  id    String @id @default(uuid())
+  name  String
+  email String
+
+  instituteId String
+  institute   Institute @relation(fields: [instituteId], references: [id])
+
+  invites   TestInvite[]
+  responses Response[]
+=======
 }
 
 model Student {
@@ -91,6 +175,7 @@ model Student {
   instituteId String
   institute   Institute @relation(fields: [instituteId], references: [id])
   invites     TestInvite[]
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
@@ -98,6 +183,23 @@ model Student {
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
 
+<<<<<<< HEAD
+  @@index([instituteId])
+}
+
+model TestInvite {
+  id String @id @default(uuid())
+
+  testId    String
+  studentId String
+
+  token     String       @unique
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime?
+
+  test    PsychometricTest @relation(fields: [testId], references: [id])
+  student Student          @relation(fields: [studentId], references: [id])
+=======
 }
 
 
@@ -110,27 +212,50 @@ model TestInvite {
 
   test    PsychometricTest @relation(fields: [testId], references: [id])
   student Student         @relation(fields: [studentId], references: [id])
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@unique([testId, studentId])
+  @@index([testId])
+  @@index([studentId])
+}
+
+model Response {
+  id String @id @default(uuid())
+
+=======
 }
 
 model Response {
   id         String   @id @default(uuid())
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
   questionId String
   studentId  String
   answer     Int
 
   question Question @relation(fields: [questionId], references: [id])
+<<<<<<< HEAD
+  student  Student  @relation(fields: [studentId], references: [id])
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
   createdBy String?
   createdAt DateTime @default(now())
   updatedBy String?
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
+<<<<<<< HEAD
+
+  @@index([studentId])
+  @@index([questionId])
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 }
 
 enum Role {
@@ -146,4 +271,8 @@ enum TestStatus {
 enum InviteStatus {
   PENDING
   COMPLETED
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f

@@ -1,6 +1,57 @@
 import { Request, Response } from 'express';
 import * as studentService from './student.service';
 
+<<<<<<< HEAD
+
+// ─── Get Students ─────────────────────────────────────────────────────────────
+
+export const getStudents = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const user = (req as any).user;
+        const instituteId: string = user?.instituteId;
+
+        if (!instituteId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 10;
+        const search = (req.query.search as string) || '';
+
+        if (page < 1 || limit < 1) {
+            res.status(400).json({
+                success: false,
+                message: 'page and limit must be positive integers'
+            });
+            return;
+        }
+
+        const result = await studentService.getStudents(instituteId, {
+            page,
+            limit,
+            search
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Students fetched successfully',
+            data: result.data,
+            meta: result.meta
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            success: false,
+            message: err?.message || 'Failed to fetch students'
+        });
+    }
+};
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Create Student ───────────────────────────────────────────────────────────
 
 export const createStudent = async (
@@ -103,6 +154,8 @@ export const bulkUploadStudents = async (
     }
 };
 
+<<<<<<< HEAD
+=======
 // ─── Get Students ─────────────────────────────────────────────────────────────
 
 export const getStudents = async (
@@ -150,6 +203,7 @@ export const getStudents = async (
     }
 };
 
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Delete Student (Soft) ────────────────────────────────────────────────────
 
 export const deleteStudent = async (

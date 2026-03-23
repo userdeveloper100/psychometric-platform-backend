@@ -59,3 +59,33 @@ export const getTestResponses = async (req: Request, res: Response) => {
         return handleError(res, error);
     }
 };
+<<<<<<< HEAD
+
+export const getAllResponses = async (req: Request, res: Response) => {
+    try {
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 10;
+
+        if (page < 1 || limit < 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'page and limit must be positive integers'
+            });
+        }
+
+        const data = await responseService.getAllResponses({ page, limit });
+
+        return res.status(200).json({
+            success: true,
+            data,
+            pagination: {
+                page,
+                limit
+            }
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+};
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f

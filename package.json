@@ -6,24 +6,52 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
+<<<<<<< HEAD
+    "start": "node dist/server.js",
+    "swagger:generate": "node ./scripts/add-swagger-to-routes.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "bcrypt": "^6.0.0",
+=======
     "start": "node dist/server.js"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+<<<<<<< HEAD
+    "express-validator": "^7.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "redis": "^5.11.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+=======
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.5"
   },
   "devDependencies": {
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^4.17.21",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.12.7",
     "@types/supertest": "^7.2.0",
+<<<<<<< HEAD
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/uuid": "^10.0.0",
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
     "jest": "^30.3.0",
     "prisma": "^6.0.0",
     "supertest": "^7.2.2",
@@ -43,6 +71,12 @@
     "TypeScript",
     "Prisma"
   ],
+<<<<<<< HEAD
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
   "author": "userdeveloper100",
   "license": "MIT"
 }

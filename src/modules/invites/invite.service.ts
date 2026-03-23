@@ -16,6 +16,14 @@ export interface InviteResult {
     }[];
 }
 
+<<<<<<< HEAD
+interface GetAllInvitesOptions {
+    page?: number;
+    limit?: number;
+}
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
 export async function inviteStudents(
@@ -227,6 +235,25 @@ export async function getStudentInvites(
     }
 }
 
+<<<<<<< HEAD
+export async function getAllInvites({
+    page = 1,
+    limit = 10
+}: GetAllInvitesOptions = {}) {
+    const currentPage = Number(page) || 1;
+    const currentLimit = Number(limit) || 10;
+    const skip = (currentPage - 1) * currentLimit;
+
+    return prisma.testInvite.findMany({
+        where: { isActive: true },
+        skip,
+        take: currentLimit,
+        orderBy: { createdAt: 'desc' }
+    });
+}
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Soft Delete Invite ───────────────────────────────────────────────────────
 
 export async function deleteInvite(
@@ -276,4 +303,8 @@ export async function deleteInvite(
         if (error instanceof Error) throw error;
         throw new Error('Failed to delete invite');
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f

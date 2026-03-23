@@ -13,6 +13,14 @@ export interface SubmitResponsesInput {
     responses: SubmitResponseItem[];
 }
 
+<<<<<<< HEAD
+interface GetAllResponsesOptions {
+    page?: number;
+    limit?: number;
+}
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const submitResponses = async (data: SubmitResponsesInput, userId: string) => {
     const { token, studentId, responses } = data;
 
@@ -180,3 +188,29 @@ export const getTestResponses = async (testId: string) => {
         throw error instanceof Error ? error : new Error('Failed to fetch test responses');
     }
 };
+<<<<<<< HEAD
+
+export const getAllResponses = async ({
+    page = 1,
+    limit = 10
+}: GetAllResponsesOptions = {}) => {
+    const currentPage = Number(page) || 1;
+    const currentLimit = Number(limit) || 10;
+    const skip = (currentPage - 1) * currentLimit;
+
+    try {
+        return await prisma.response.findMany({
+            where: { isActive: true },
+            skip,
+            take: currentLimit,
+            orderBy: { createdAt: 'desc' }
+        });
+    } catch (error) {
+        logger.error('Failed to fetch responses', {
+            error: error instanceof Error ? error.message : error
+        });
+        throw error instanceof Error ? error : new Error('Failed to fetch responses');
+    }
+};
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f

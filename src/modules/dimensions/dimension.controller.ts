@@ -65,6 +65,43 @@ export const getTestDimensions = async (
     }
 };
 
+<<<<<<< HEAD
+export const getAllDimensions = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 10;
+
+        if (page < 1 || limit < 1) {
+            res.status(400).json({
+                success: false,
+                message: 'page and limit must be positive integers'
+            });
+            return;
+        }
+
+        const data = await dimensionService.getAllDimensions({ page, limit });
+
+        res.status(200).json({
+            success: true,
+            data,
+            pagination: {
+                page,
+                limit
+            }
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            success: false,
+            message: err?.message || 'Failed to fetch dimensions'
+        });
+    }
+};
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const deleteDimension = async (
     req: Request,
     res: Response

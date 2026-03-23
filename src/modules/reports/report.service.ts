@@ -21,6 +21,14 @@ type TestReport = {
     }>;
 };
 
+<<<<<<< HEAD
+interface GetAllReportsOptions {
+    page?: number;
+    limit?: number;
+}
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const getStudentReport = async (studentId: string, testId: string): Promise<StudentReport> => {
     if (!studentId) throw new Error('studentId is required');
     if (!testId) throw new Error('testId is required');
@@ -133,3 +141,29 @@ export const getTestReport = async (testId: string): Promise<TestReport> => {
         throw error instanceof Error ? error : new Error('Failed to generate test report');
     }
 };
+<<<<<<< HEAD
+
+export const getAllReports = async ({
+    page = 1,
+    limit = 10
+}: GetAllReportsOptions = {}) => {
+    const currentPage = Number(page) || 1;
+    const currentLimit = Number(limit) || 10;
+    const skip = (currentPage - 1) * currentLimit;
+
+    try {
+        return await prisma.psychometricTest.findMany({
+            where: { isActive: true },
+            skip,
+            take: currentLimit,
+            orderBy: { createdAt: 'desc' }
+        });
+    } catch (error) {
+        logger.error('Failed to fetch reports', {
+            error: error instanceof Error ? error.message : error
+        });
+        throw error instanceof Error ? error : new Error('Failed to fetch reports');
+    }
+};
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f

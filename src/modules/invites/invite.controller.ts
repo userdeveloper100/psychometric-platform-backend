@@ -130,6 +130,43 @@ export const getStudentInvites = async (
     }
 };
 
+<<<<<<< HEAD
+export const getAllInvites = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const page = Number(req.query.page) || 1;
+        const limit = Number(req.query.limit) || 10;
+
+        if (page < 1 || limit < 1) {
+            res.status(400).json({
+                success: false,
+                message: 'page and limit must be positive integers'
+            });
+            return;
+        }
+
+        const data = await inviteService.getAllInvites({ page, limit });
+
+        res.status(200).json({
+            success: true,
+            data,
+            pagination: {
+                page,
+                limit
+            }
+        });
+    } catch (err: any) {
+        res.status(500).json({
+            success: false,
+            message: err?.message || 'Failed to fetch invites'
+        });
+    }
+};
+
+=======
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Soft Delete Invite ───────────────────────────────────────────────────────
 
 export const deleteInvite = async (
@@ -167,4 +204,8 @@ export const deleteInvite = async (
                     message.includes('completed') ? 409 : 400;
         res.status(status).json({ success: false, message });
     }
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 11519917377035306673a076a7e613f111ba9d8f
