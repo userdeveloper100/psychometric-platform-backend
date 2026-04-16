@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Psychometric Platform Backend
 
 Backend API for the Psychometric Assessment Platform built with **Node.js, Express, TypeScript, Prisma, and PostgreSQL**.
