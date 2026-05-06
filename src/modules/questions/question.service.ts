@@ -7,14 +7,11 @@ interface CreateQuestionInput {
     scaleMax?: number;
 }
 
-<<<<<<< HEAD
 interface GetAllQuestionsOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export async function createQuestion(
     dimensionId: string,
     { text, scaleMin = 1, scaleMax = 5 }: CreateQuestionInput
@@ -70,7 +67,6 @@ export async function getDimensionQuestions(dimensionId: string) {
     }
 }
 
-<<<<<<< HEAD
 export async function getAllQuestions({
     page = 1,
     limit = 10
@@ -87,8 +83,6 @@ export async function getAllQuestions({
     });
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export async function deleteQuestion(questionId: string) {
     try {
         return await prisma.question.delete({

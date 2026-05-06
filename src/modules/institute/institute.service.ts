@@ -12,14 +12,11 @@ interface GetInstitutesOptions {
     search?: string;
 }
 
-<<<<<<< HEAD
 interface GetAllInstitutesOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Create Institute ─────────────────────────────────────────────────────────
 
 export async function createInstitute({ name, email }: CreateInstituteInput) {
@@ -112,7 +109,6 @@ export async function getInstitutes({
     }
 }
 
-<<<<<<< HEAD
 export async function getAllInstitutes({
     page = 1,
     limit = 10
@@ -129,8 +125,6 @@ export async function getAllInstitutes({
     });
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Get Institute By ID ──────────────────────────────────────────────────────
 
 export async function getInstituteById(id: string) {

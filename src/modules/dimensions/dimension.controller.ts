@@ -65,7 +65,6 @@ export const getTestDimensions = async (
     }
 };
 
-<<<<<<< HEAD
 export const getAllDimensions = async (
     req: Request,
     res: Response
@@ -100,8 +99,6 @@ export const getAllDimensions = async (
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const deleteDimension = async (
     req: Request,
     res: Response

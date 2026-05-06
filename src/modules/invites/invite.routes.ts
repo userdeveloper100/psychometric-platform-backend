@@ -6,7 +6,6 @@ import { authorizeRoles } from '../../middleware/role.middleware';
 const router = Router();
 
 /**
-<<<<<<< HEAD
  * @swagger
  * /api/invites:
  *   get:
@@ -42,13 +41,10 @@ router.get(
 );
 
 /**
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
  * @route   POST /api/invites/tests/:testId/invite
  * @desc    Invite students to a test (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/tests/{testId}/invite:
@@ -99,8 +95,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.post(
     '/tests/:testId/invite',
     authenticateJWT,
@@ -113,7 +107,6 @@ router.post(
  * @desc    Get all invites for a test (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/tests/{testId}/invites:
@@ -154,8 +147,6 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/tests/:testId/invites',
     authenticateJWT,
@@ -168,7 +159,6 @@ router.get(
  * @desc    Get all invites for a student
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/students/{studentId}/invites:
@@ -209,8 +199,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/students/:studentId/invites',
     authenticateJWT,
@@ -222,7 +210,6 @@ router.get(
  * @desc    Soft delete an invite (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/{id}:
@@ -263,8 +250,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.delete(
     '/:id',
     authenticateJWT,
@@ -272,8 +257,4 @@ router.delete(
     inviteController.deleteInvite
 );
 
-<<<<<<< HEAD
 export default router;
-=======
-export default router;
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f

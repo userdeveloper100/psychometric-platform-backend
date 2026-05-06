@@ -6,14 +6,11 @@ interface CreateDimensionInput {
     description: string;
 }
 
-<<<<<<< HEAD
 interface GetAllDimensionsOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export async function createDimension(
     testId: string,
     { name, description }: CreateDimensionInput
@@ -63,7 +60,6 @@ export async function getTestDimensions(testId: string) {
     }
 }
 
-<<<<<<< HEAD
 export async function getAllDimensions({
     page = 1,
     limit = 10
@@ -80,8 +76,6 @@ export async function getAllDimensions({
     });
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export async function deleteDimension(dimensionId: string) {
     try {
         return await prisma.dimension.delete({

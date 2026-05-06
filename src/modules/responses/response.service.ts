@@ -13,14 +13,11 @@ export interface SubmitResponsesInput {
     responses: SubmitResponseItem[];
 }
 
-<<<<<<< HEAD
 interface GetAllResponsesOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const submitResponses = async (data: SubmitResponsesInput, userId: string) => {
     const { token, studentId, responses } = data;
 
@@ -188,7 +185,6 @@ export const getTestResponses = async (testId: string) => {
         throw error instanceof Error ? error : new Error('Failed to fetch test responses');
     }
 };
-<<<<<<< HEAD
 
 export const getAllResponses = async ({
     page = 1,
@@ -212,5 +208,3 @@ export const getAllResponses = async ({
         throw error instanceof Error ? error : new Error('Failed to fetch responses');
     }
 };
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f

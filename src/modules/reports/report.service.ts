@@ -21,14 +21,11 @@ type TestReport = {
     }>;
 };
 
-<<<<<<< HEAD
 interface GetAllReportsOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const getStudentReport = async (studentId: string, testId: string): Promise<StudentReport> => {
     if (!studentId) throw new Error('studentId is required');
     if (!testId) throw new Error('testId is required');
@@ -141,7 +138,6 @@ export const getTestReport = async (testId: string): Promise<TestReport> => {
         throw error instanceof Error ? error : new Error('Failed to generate test report');
     }
 };
-<<<<<<< HEAD
 
 export const getAllReports = async ({
     page = 1,
@@ -165,5 +161,3 @@ export const getAllReports = async ({
         throw error instanceof Error ? error : new Error('Failed to fetch reports');
     }
 };
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f

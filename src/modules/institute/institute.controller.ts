@@ -84,7 +84,6 @@ export const getInstitutes = async (
     }
 };
 
-<<<<<<< HEAD
 export const getAllInstitutes = async (
     req: Request,
     res: Response
@@ -119,8 +118,6 @@ export const getAllInstitutes = async (
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Get Institute By ID ──────────────────────────────────────────────────────
 
 export const getInstituteById = async (

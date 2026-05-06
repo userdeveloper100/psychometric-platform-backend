@@ -5,7 +5,6 @@ import { authorizeRoles } from '../../middleware/role.middleware';
 
 const router = Router();
 
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/dimensions:
@@ -165,16 +164,12 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
-// Logged-in users can view dimensions
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/tests/:testId/dimensions',
     authenticateJWT,
     dimensionController.getTestDimensions
 );
 
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/dimensions/tests/{testId}/dimensions:
@@ -327,9 +322,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
-// ADMIN only create/delete
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.post(
     '/tests/:testId/dimensions',
     authenticateJWT,
@@ -337,7 +329,6 @@ router.post(
     dimensionController.createDimension
 );
 
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/dimensions/dimensions/{id}:
@@ -455,8 +446,6 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.delete(
     '/dimensions/:id',
     authenticateJWT,

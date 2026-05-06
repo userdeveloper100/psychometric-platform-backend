@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import * as authController from './auth.controller';
+import { authenticateJWT } from '../../middleware/auth.middleware';
 
 const router = Router();
 
 /**
-<<<<<<< HEAD
  * @swagger
  * /api/auth/register:
  *   post:
@@ -114,57 +114,9 @@ const router = Router();
  *                   type: string
  *                   example: Internal server error
  */
-/**
- * @swagger
- * /api/v1/register:
- *   post:
- *     summary: Create resource (/register)
- *     description: Auth API endpoint.
- *     tags: [Auth]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             additionalProperties: true
- *           example:
- *             name: "Sample Name"
- *             description: "Sample payload"
- *     responses:
- *       200:
- *         description: Request successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Success"
- *       201:
- *         description: Resource created successfully
- *       400:
- *         description: Bad request
- *       404:
- *         description: Resource not found
- *       500:
- *         description: Internal server error
-=======
- * @route   POST /api/auth/register
- * @desc    Register a new institute admin
- * @access  Public
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
- */
 router.post('/register', authController.register);
 
 /**
-<<<<<<< HEAD
  * @swagger
  * /api/auth/login:
  *   post:
@@ -264,28 +216,36 @@ router.post('/register', authController.register);
  *                   type: string
  *                   example: Internal server error
  */
+router.post('/login', authController.login);
+
 /**
  * @swagger
- * /api/v1/login:
- *   post:
- *     summary: Create resource (/login)
- *     description: Auth API endpoint.
+ * /api/auth/users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     description: Retrieves a paginated list of all users. Requires admin role.
  *     tags: [Auth]
  *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             additionalProperties: true
- *           example:
- *             name: "Sample Name"
- *             description: "Sample payload"
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of users per page
  *     responses:
  *       200:
- *         description: Request successful
+ *         description: Users retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -296,21 +256,96 @@ router.post('/register', authController.register);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Success"
- *       201:
- *         description: Resource created successfully
+ *                   example: Users fetched successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: clx123abc
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                         example: admin@acme.com
+ *                       role:
+ *                         type: string
+ *                         enum: [ADMIN, STUDENT]
+ *                         example: ADMIN
+ *                       instituteId:
+ *                         type: string
+ *                         example: inst_001
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2023-01-01T00:00:00.000Z
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: 2023-01-01T00:00:00.000Z
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *       401:
+ *         description: Unauthorized - No token provided
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: No token provided
+ *       403:
+ *         description: Forbidden - Admin role required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Access denied. Admin role required.
  *       400:
- *         description: Bad request
- *       404:
- *         description: Resource not found
+ *         description: Bad Request - Invalid pagination parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: page and limit must be positive integers
  *       500:
  *         description: Internal server error
-=======
- * @route   POST /api/auth/login
- * @desc    Login user and return JWT token
- * @access  Public
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Failed to fetch users
  */
-router.post('/login', authController.login);
+router.get('/users', authenticateJWT, authController.getAllUsers);
 
 export default router;

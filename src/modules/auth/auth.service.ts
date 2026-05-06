@@ -8,6 +8,7 @@ interface RegisterInstituteAdminInput {
     instituteName: string;
     email: string;
     password: string;
+    createdBy?: string;
 }
 
 interface LoginInput {
@@ -15,10 +16,16 @@ interface LoginInput {
     password: string;
 }
 
+interface GetAllUsersOptions {
+    page?: number;
+    limit?: number;
+}
+
 export async function registerInstituteAdmin({
     instituteName,
     email,
-    password
+    password,
+    createdBy
 }: RegisterInstituteAdminInput) {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -26,7 +33,7 @@ export async function registerInstituteAdmin({
         const { user } = await prisma.$transaction(async (tx) => {
             // 1. Create institute
             const institute = await tx.institute.create({
-                data: { name: instituteName, email }
+                data: { name: instituteName, email, createdBy }
             });
 
             // 2,3,4. Create ADMIN user linked to institute with hashed password
@@ -35,7 +42,8 @@ export async function registerInstituteAdmin({
                     email,
                     password: hashedPassword,
                     role: "ADMIN",
-                    instituteId: institute.id
+                    instituteId: institute.id,
+                    createdBy
                 },
                 select: {
                     id: true,
@@ -108,4 +116,48 @@ export async function login({ email, password }: LoginInput) {
         }
         throw new Error('Login failed');
     }
+}
+
+export async function getAllUsers({
+    page = 1,
+    limit = 10
+}: GetAllUsersOptions = {}) {
+    const currentPage = Number(page) || 1;
+    const currentLimit = Number(limit) || 10;
+    const skip = (currentPage - 1) * currentLimit;
+
+    return prisma.user.findMany({
+        where: { isActive: true },
+        skip,
+        take: currentLimit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+            id: true,
+            email: true,
+            role: true,
+            instituteId: true,
+            createdAt: true,
+            updatedAt: true
+        }
+    });
+}
+
+// Add to auth.service.ts
+export async function deleteUser(userId: string, adminId: string) {
+    const user = await prisma.user.findFirst({
+        where: { id: userId, isActive: true }
+    });
+    
+    if (!user) {
+        throw new Error('User not found');
+    }
+    
+    return prisma.user.update({
+        where: { id: userId },
+        data: {
+            isActive: false,
+            updatedBy: adminId,
+            updatedAt: new Date()
+        }
+    });
 }

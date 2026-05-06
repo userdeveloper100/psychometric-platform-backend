@@ -63,7 +63,6 @@ export const getDimensionQuestions = async (
     }
 };
 
-<<<<<<< HEAD
 export const getAllQuestions = async (
     req: Request,
     res: Response
@@ -98,8 +97,6 @@ export const getAllQuestions = async (
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const deleteQuestion = async (
     req: Request,
     res: Response

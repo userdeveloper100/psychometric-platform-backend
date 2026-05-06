@@ -59,7 +59,6 @@ export const getTestResponses = async (req: Request, res: Response) => {
         return handleError(res, error);
     }
 };
-<<<<<<< HEAD
 
 export const getAllResponses = async (req: Request, res: Response) => {
     try {
@@ -87,5 +86,3 @@ export const getAllResponses = async (req: Request, res: Response) => {
         return handleError(res, error);
     }
 };
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f

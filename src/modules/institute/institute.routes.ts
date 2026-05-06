@@ -4,7 +4,6 @@ import * as instituteController from './institute.controller';
 const router = Router();
 
 // Create
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/:
@@ -226,18 +225,6 @@ router.put('/:id', instituteController.updateInstitute);
  *       500:
  *         description: Internal server error
  */
-=======
-router.post('/', instituteController.createInstitute);
-
-// Read
-router.get('/', instituteController.getInstitutes);
-router.get('/:id', instituteController.getInstituteById);
-
-// Update
-router.put('/:id', instituteController.updateInstitute);
-
-// Soft delete
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.delete('/:id', instituteController.deleteInstitute);
 
 export default router;

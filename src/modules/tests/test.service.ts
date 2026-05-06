@@ -33,14 +33,11 @@ interface GetInstituteTestsOptions {
     search?: string;
 }
 
-<<<<<<< HEAD
 interface GetAllTestsOptions {
     page?: number;
     limit?: number;
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 interface PublishTestInput {
     testId: string;
     instituteId: string;
@@ -162,7 +159,6 @@ export async function getInstituteTests({
     }
 }
 
-<<<<<<< HEAD
 export async function getAllTests({
     page = 1,
     limit = 10
@@ -179,8 +175,6 @@ export async function getAllTests({
     });
 }
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Publish Test ─────────────────────────────────────────────────────────────
 
 export async function publishTest({

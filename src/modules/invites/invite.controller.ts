@@ -130,7 +130,6 @@ export const getStudentInvites = async (
     }
 };
 
-<<<<<<< HEAD
 export const getAllInvites = async (
     req: Request,
     res: Response
@@ -165,8 +164,6 @@ export const getAllInvites = async (
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 // ─── Soft Delete Invite ───────────────────────────────────────────────────────
 
 export const deleteInvite = async (
@@ -204,8 +201,4 @@ export const deleteInvite = async (
                     message.includes('completed') ? 409 : 400;
         res.status(status).json({ success: false, message });
     }
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f

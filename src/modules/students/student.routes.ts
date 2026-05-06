@@ -2,47 +2,17 @@ import { Router } from 'express';
 import * as studentController from './student.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
 import { authorizeRoles } from '../../middleware/role.middleware';
-<<<<<<< HEAD
 import { createStudentValidation } from "./student.validation";
 import { validateRequest } from "../../middleware/validate.middleware";
 
 const router = Router();
 
-=======
-
-const router = Router();
-
-/**
- * @route   POST /api/students
- * @desc    Create a single student (ADMIN only)
- * @access  Private
- */
-router.post(
-    '/',
-    authenticateJWT,
-    authorizeRoles('ADMIN'),
-    studentController.createStudent
-);
-
-/**
- * @route   POST /api/students/bulk-upload
- * @desc    Bulk upload students from array (ADMIN only)
- * @access  Private
- */
-router.post(
-    '/bulk-upload',
-    authenticateJWT,
-    authorizeRoles('ADMIN'),
-    studentController.bulkUploadStudents
-);
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
 /**
  * @route   GET /api/students?page=1&limit=10&search=
  * @desc    Get all active students (paginated)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/students:
@@ -90,8 +60,6 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/',
     authenticateJWT,
@@ -100,7 +68,6 @@ router.get(
 );
 
 /**
-<<<<<<< HEAD
  * @swagger
  * /api/students/AddStudent:
  *   post:
@@ -237,13 +204,10 @@ router.post(
 
 
 /**
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
  * @route   DELETE /api/students/:id
  * @desc    Soft delete a student (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/{id}:
@@ -284,8 +248,6 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.delete(
     '/:id',
     authenticateJWT,

@@ -6,7 +6,6 @@ import { authorizeRoles } from '../../middleware/role.middleware';
 const router = Router();
 
 // Only ADMIN can access reports
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/reports:
@@ -89,8 +88,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/reports/student/:studentId/test/:testId',
     authenticateJWT,
@@ -98,7 +95,6 @@ router.get(
     reportController.getTestReport
 );
 
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/reports/test/{testId}:
@@ -139,8 +135,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get(
     '/reports/test/:testId',
     authenticateJWT,

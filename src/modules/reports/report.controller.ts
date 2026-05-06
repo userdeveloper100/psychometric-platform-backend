@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import * as reportService from './report.service';
 
-<<<<<<< HEAD
 export const getAllReports = async (req: Request, res: Response) => {
     try {
         const page = Number(req.query.page) || 1;
@@ -33,8 +32,6 @@ export const getAllReports = async (req: Request, res: Response) => {
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const getTestReport = async (req: Request, res: Response) => {
     try {
         const { id: testId } = req.params;

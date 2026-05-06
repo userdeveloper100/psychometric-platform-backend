@@ -3,16 +3,3 @@ node_modules
 dist
 coverage
 *.log
-_bmad
-_bmad-output
-.agent
-.agents
-.bmad
-.bmad-output
-.claude
-.cursor
-.github
-.idea
-.vscode
-*.iml
-*.sln

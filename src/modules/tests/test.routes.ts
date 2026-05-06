@@ -8,7 +8,6 @@ const router = Router();
  * @desc    Create a new test (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/:
@@ -49,8 +48,6 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.post('/', testController.createTest);
 
 /**
@@ -58,7 +55,6 @@ router.post('/', testController.createTest);
  * @desc    Get tests for an institute (paginated)
  * @access  Private/Public (based on your middleware setup)
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/tests:
@@ -105,16 +101,12 @@ router.post('/', testController.createTest);
  *         description: Internal server error
  */
 router.get('/', testController.getAllTests);
-=======
-router.get('/', testController.getInstituteTests);
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 
 /**
  * @route   PATCH /api/tests/:id/publish
  * @desc    Publish a test (ADMIN only)
  * @access  Private
  */
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/v1/{id}/publish:
@@ -163,8 +155,6 @@ router.get('/', testController.getInstituteTests);
  *       500:
  *         description: Internal server error
  */
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.patch('/:id/publish', testController.publishTest);
 
 export default router;

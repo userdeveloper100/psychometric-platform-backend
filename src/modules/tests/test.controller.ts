@@ -113,7 +113,6 @@ export const getInstituteTests = async (
     }
 };
 
-<<<<<<< HEAD
 export const getAllTests = async (
     req: Request,
     res: Response
@@ -148,8 +147,6 @@ export const getAllTests = async (
     }
 };
 
-=======
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 export const publishTest = async (req: Request, res: Response): Promise<void> => {
     try {
         const testId = req.params.id;

@@ -4,7 +4,6 @@ import { authenticateJWT } from '../../middleware/auth.middleware';
 
 const router = Router();
 
-<<<<<<< HEAD
 /**
  * @swagger
  * /api/responses:
@@ -159,10 +158,6 @@ router.get('/responses/student/:studentId', authenticateJWT, responseController.
  *       500:
  *         description: Internal server error
  */
-=======
-router.post('/responses/submit', authenticateJWT, responseController.submitResponses);
-router.get('/responses/student/:studentId', authenticateJWT, responseController.getStudentResponses);
->>>>>>> 11519917377035306673a076a7e613f111ba9d8f
 router.get('/responses/test/:testId', authenticateJWT, responseController.getTestResponses);
 
 export default router;
