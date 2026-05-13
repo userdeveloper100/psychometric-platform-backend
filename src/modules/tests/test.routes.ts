@@ -157,4 +157,36 @@ router.get('/', testController.getAllTests);
  */
 router.patch('/:id/publish', testController.publishTest);
 
+/**
+ * @route   DELETE /api/tests/:id
+ * @desc    Delete a test (ADMIN only)
+ * @access  Private
+ */
+/**
+ * @swagger
+ * /api/v1/{id}:
+ *   delete:
+ *     summary: Delete resource (/:id)
+ *     description: Tests API endpoint.
+ *     tags: [Tests]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: id identifier
+ *         schema:
+ *           type: string
+ *           example: "id-123"
+ *     responses:
+ *       200:
+ *         description: Request successful
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Resource not found
+ *       500:
+ *         description: Internal server error
+ */
+router.delete('/:id', testController.deleteTest);
+
 export default router;

@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { cascadeSoftDelete } from '../../utils/softDelete';
 
 interface CreateQuestionInput {
     text: string;
@@ -35,7 +36,8 @@ export async function createQuestion(
                 text,
                 dimensionId,
                 scaleMin,
-                scaleMax
+                scaleMax,
+                isActive: true
             }
         });
 
@@ -48,8 +50,11 @@ export async function createQuestion(
 
 export async function getDimensionQuestions(dimensionId: string) {
     try {
-        const dimension = await prisma.dimension.findUnique({
-            where: { id: dimensionId },
+        const dimension = await prisma.dimension.findFirst({
+            where: {
+                id: dimensionId,
+                isActive: true
+            },
             select: { id: true }
         });
 
@@ -58,7 +63,7 @@ export async function getDimensionQuestions(dimensionId: string) {
         }
 
         return await prisma.question.findMany({
-            where: { dimensionId },
+            where: { dimensionId, isActive: true },
             orderBy: { createdAt: 'asc' }
         });
     } catch (error) {
@@ -83,18 +88,24 @@ export async function getAllQuestions({
     });
 }
 
-export async function deleteQuestion(questionId: string) {
+export async function deleteQuestion(questionId: string, userId: string) {
     try {
-        return await prisma.question.delete({
-            where: { id: questionId }
+        const question = await prisma.question.findFirst({
+            where: {
+                id: questionId,
+                isActive: true
+            }
         });
-    } catch (error) {
-        if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2025'
-        ) {
+
+        if (!question) {
             throw new Error('Question not found');
         }
+
+        await cascadeSoftDelete('question', questionId, ['response'], userId);
+
+        return { success: true };
+    } catch (error) {
+        if (error instanceof Error) throw error;
         throw new Error('Failed to delete question');
     }
 }

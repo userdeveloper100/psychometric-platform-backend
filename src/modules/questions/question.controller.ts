@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as questionService from './question.service';
+import { AuthRequest } from '../../middleware/auth.middleware';
 
 export const createQuestion = async (
     req: Request,
@@ -98,18 +99,24 @@ export const getAllQuestions = async (
 };
 
 export const deleteQuestion = async (
-    req: Request,
+    req: AuthRequest,
     res: Response
 ): Promise<void> => {
     try {
         const { id } = req.params;
+        const userId = req.user?.userId;
 
         if (!id) {
             res.status(400).json({ success: false, message: 'question id is required' });
             return;
         }
 
-        const deleted = await questionService.deleteQuestion(id);
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const deleted = await questionService.deleteQuestion(id, userId);
 
         res.status(200).json({
             success: true,

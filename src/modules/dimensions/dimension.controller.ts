@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as dimensionService from './dimension.service';
+import { AuthRequest } from '../../middleware/auth.middleware';
 
 export const createDimension = async (
     req: Request,
@@ -100,18 +101,24 @@ export const getAllDimensions = async (
 };
 
 export const deleteDimension = async (
-    req: Request,
+    req: AuthRequest,
     res: Response
 ): Promise<void> => {
     try {
         const { id } = req.params;
+        const userId = req.user?.userId;
 
         if (!id) {
             res.status(400).json({ success: false, message: 'dimension id is required' });
             return;
         }
 
-        const deleted = await dimensionService.deleteDimension(id);
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const deleted = await dimensionService.deleteDimension(id, userId);
 
         res.status(200).json({
             success: true,

@@ -160,4 +160,33 @@ router.get('/responses/student/:studentId', authenticateJWT, responseController.
  */
 router.get('/responses/test/:testId', authenticateJWT, responseController.getTestResponses);
 
+/**
+ * @swagger
+ * /api/v1/responses/{id}:
+ *   delete:
+ *     summary: Delete resource (/responses/:id)
+ *     description: Responses API endpoint.
+ *     tags: [Responses]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: response id identifier
+ *         schema:
+ *           type: string
+ *           example: "id-123"
+ *     responses:
+ *       200:
+ *         description: Request successful
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Resource not found
+ *       500:
+ *         description: Internal server error
+ */
+router.delete('/responses/:id', authenticateJWT, responseController.deleteResponse);
+
 export default router;

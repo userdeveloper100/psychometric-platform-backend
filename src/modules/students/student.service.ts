@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { cascadeSoftDelete } from '../../utils/softDelete';
 import logger from '../../config/logger';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -217,16 +218,11 @@ export async function deleteStudent(
             throw new Error('Student not found');
         }
 
-        const updated = await prisma.student.update({
-            where: { id: studentId },
-            data: {
-                isActive: false,
-                updatedBy: userId
-            }
-        });
+        // Cascade delete to invites and responses
+        await cascadeSoftDelete('student', studentId, ['testInvite', 'response'], userId);
 
         logger.info('Student soft deleted', { studentId });
-        return updated;
+        return { success: true };
     } catch (error) {
         logger.error('Failed to delete student', {
             error: error instanceof Error ? error.message : error,

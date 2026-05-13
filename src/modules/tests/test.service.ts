@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { cascadeSoftDelete } from '../../utils/softDelete';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,8 @@ export async function createTest({
                 title,
                 description,
                 instituteId,
-                status: TestStatus.DRAFT  // always starts as DRAFT
+                status: TestStatus.DRAFT,
+                isActive: true
             },
             select: {
                 id: true,
@@ -115,6 +117,7 @@ export async function getInstituteTests({
         // Build dynamic where clause
         const where: Prisma.PsychometricTestWhereInput = {
             instituteId,
+            isActive: true,
             ...(status && { status }),
             ...(search && {
                 OR: [
@@ -189,8 +192,11 @@ export async function publishTest({
         }
 
         // Fetch existing test
-        const existingTest = await prisma.psychometricTest.findUnique({
-            where: { id: testId },
+        const existingTest = await prisma.psychometricTest.findFirst({
+            where: {
+                id: testId,
+                isActive: true
+            },
             select: { id: true, status: true, instituteId: true }
         });
 
@@ -225,5 +231,41 @@ export async function publishTest({
     } catch (error) {
         if (error instanceof Error) throw error;
         throw new Error('Failed to publish test');
+    }
+}
+
+// ─── Delete Test ──────────────────────────────────────────────────────────
+
+export async function deleteTest({
+    testId,
+    instituteId,
+    requestedBy
+}: PublishTestInput) {
+    try {
+        // Guard: only ADMIN users can delete tests
+        if (requestedBy.role !== UserRole.ADMIN) {
+            throw new Error('Only ADMIN users can delete tests');
+        }
+
+        // Guard: admin can only delete tests from their own institute
+        const existingTest = await prisma.psychometricTest.findFirst({
+            where: {
+                id: testId,
+                isActive: true,
+                instituteId
+            }
+        });
+
+        if (!existingTest) {
+            throw new Error('Test not found');
+        }
+
+        // Cascade delete to dimensions and test invites
+        await cascadeSoftDelete('psychometricTest', testId, ['dimension', 'testInvite'], requestedBy.instituteId);
+
+        return { success: true };
+    } catch (error) {
+        if (error instanceof Error) throw error;
+        throw new Error('Failed to delete test');
     }
 }

@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { cascadeSoftDelete } from '../../utils/softDelete';
 
 interface CreateDimensionInput {
     name: string;
@@ -28,7 +29,8 @@ export async function createDimension(
         const dimension = await prisma.dimension.create({
             data: {
                 name,
-                testId
+                testId,
+                isActive: true
             }
         });
 
@@ -41,8 +43,11 @@ export async function createDimension(
 
 export async function getTestDimensions(testId: string) {
     try {
-        const test = await prisma.psychometricTest.findUnique({
-            where: { id: testId },
+        const test = await prisma.psychometricTest.findFirst({
+            where: {
+                id: testId,
+                isActive: true
+            },
             select: { id: true }
         });
 
@@ -51,8 +56,8 @@ export async function getTestDimensions(testId: string) {
         }
 
         return prisma.dimension.findMany({
-            where: { testId },
-            orderBy: { createdAt: 'asc' } // requires createdAt in Dimension model
+            where: { testId, isActive: true },
+            orderBy: { createdAt: 'asc' }
         });
     } catch (error) {
         if (error instanceof Error) throw error;
@@ -76,18 +81,24 @@ export async function getAllDimensions({
     });
 }
 
-export async function deleteDimension(dimensionId: string) {
+export async function deleteDimension(dimensionId: string, userId: string) {
     try {
-        return await prisma.dimension.delete({
-            where: { id: dimensionId }
+        const dimension = await prisma.dimension.findFirst({
+            where: {
+                id: dimensionId,
+                isActive: true
+            }
         });
-    } catch (error) {
-        if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2025'
-        ) {
+
+        if (!dimension) {
             throw new Error('Dimension not found');
         }
+
+        await cascadeSoftDelete('dimension', dimensionId, ['question'], userId);
+
+        return { success: true };
+    } catch (error) {
+        if (error instanceof Error) throw error;
         throw new Error('Failed to delete dimension');
     }
 }

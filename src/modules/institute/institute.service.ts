@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
+import { cascadeSoftDelete } from '../../utils/softDelete';
 
 interface CreateInstituteInput {
     name: string;
@@ -24,7 +25,8 @@ export async function createInstitute({ name, email }: CreateInstituteInput) {
         const institute = await prisma.institute.create({
             data: {
                 name,
-                email
+                email,
+                isActive: true
             },
             select: {
                 id: true,
@@ -57,8 +59,9 @@ export async function getInstitutes({
         const skip = (page - 1) * limit;
 
         // Build dynamic where clause for search
-        const where: Prisma.InstituteWhereInput = search
-            ? {
+        const where: Prisma.InstituteWhereInput = {
+            isActive: true,
+            ...(search && {
                 OR: [
                     {
                         name: {
@@ -73,8 +76,8 @@ export async function getInstitutes({
                         }
                     }
                 ]
-            }
-            : {};
+            })
+        };
 
         // Run count and fetch in parallel for performance
         const [total, institutes] = await Promise.all([
@@ -129,8 +132,11 @@ export async function getAllInstitutes({
 
 export async function getInstituteById(id: string) {
     try {
-        const institute = await prisma.institute.findUnique({
-            where: { id },
+        const institute = await prisma.institute.findFirst({
+            where: {
+                id,
+                isActive: true
+            },
             select: {
                 id: true,
                 name: true,
@@ -180,14 +186,7 @@ export async function deleteInstitute(id: string, userId: string) {
         throw new Error('Institute not found');
     }
 
-    await prisma.institute.update({
-        where: { id },
-        data: {
-            isActive: false,
-            updatedBy: userId,
-            updatedAt: new Date()
-        }
-    });
+    await cascadeSoftDelete('institute', id, ['user', 'student', 'psychometricTest'], userId);
 
     return { success: true };
 }

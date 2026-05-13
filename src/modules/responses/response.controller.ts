@@ -86,3 +86,27 @@ export const getAllResponses = async (req: Request, res: Response) => {
         return handleError(res, error);
     }
 };
+
+export const deleteResponse = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const userId = getUserId(req);
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: 'response id is required'
+            });
+        }
+
+        const result = await responseService.deleteResponse(id, userId);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Response deleted successfully',
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+};

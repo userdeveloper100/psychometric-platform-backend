@@ -208,3 +208,34 @@ export const getAllResponses = async ({
         throw error instanceof Error ? error : new Error('Failed to fetch responses');
     }
 };
+
+export const deleteResponse = async (responseId: string, userId: string) => {
+    if (!responseId) throw new Error('Response ID is required');
+
+    try {
+        const response = await prisma.response.findFirst({
+            where: {
+                id: responseId,
+                isActive: true
+            }
+        });
+
+        if (!response) {
+            throw new Error('Response not found');
+        }
+
+        return await prisma.response.update({
+            where: { id: responseId },
+            data: {
+                isActive: false,
+                updatedBy: userId,
+                updatedAt: new Date()
+            }
+        });
+    } catch (error) {
+        logger.error('Failed to delete response', {
+            error: error instanceof Error ? error.message : error
+        });
+        throw error instanceof Error ? error : new Error('Failed to delete response');
+    }
+};

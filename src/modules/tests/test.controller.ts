@@ -196,3 +196,52 @@ export const publishTest = async (req: Request, res: Response): Promise<void> =>
         res.status(status).json({ success: false, message });
     }
 };
+
+export const deleteTest = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const testId = req.params.id;
+        const instituteId =
+            (req.body.instituteId as string) ||
+            ((req as any).user?.instituteId as string);
+        const user = (req as any).user;
+
+        if (!testId) {
+            res.status(400).json({
+                success: false,
+                message: 'test id is required'
+            });
+            return;
+        }
+
+        if (!user?.role || !user?.instituteId || !instituteId) {
+            res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            });
+            return;
+        }
+
+        const test = await testService.deleteTest({
+            testId,
+            instituteId,
+            requestedBy: {
+                role: user.role,
+                instituteId: user.instituteId
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Test deleted successfully',
+            data: test
+        });
+    } catch (err: any) {
+        const message = err?.message || 'Failed to delete test';
+        const status =
+            message.includes('Only ADMIN') ? 403 :
+                message.includes('own institute') ? 403 :
+                    message.includes('Test not found') ? 404 : 400;
+
+        res.status(status).json({ success: false, message });
+    }
+};
