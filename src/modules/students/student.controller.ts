@@ -1,51 +1,59 @@
 import { Request, Response } from 'express';
 import * as studentService from './student.service';
-
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    conflictResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    serverErrorResponse
+} from '../../utils/response-helpers';
+import { ErrorCode } from '../../types/api-response.types';
 
 // ─── Get Students ─────────────────────────────────────────────────────────────
 
 export const getStudents = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const user = (req as any).user;
         const instituteId: string = user?.instituteId;
 
         if (!instituteId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
         const search = (req.query.search as string) || '';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
         const result = await studentService.getStudents(instituteId, {
-            page,
-            limit,
+            page: Number(page),
+            limit: Number(limit),
             search
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'Students fetched successfully',
-            data: result.data,
-            meta: result.meta
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch students'
-        });
+        const pagination = {
+            page: Number(page),
+            limit: Number(limit),
+            total: result.meta.total,
+            totalPages: result.meta.totalPages,
+            hasNextPage: result.meta.hasNextPage,
+            hasPreviousPage: result.meta.hasPreviousPage
+        };
+
+        return paginatedResponse(res, result.data, pagination, 'Students fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch students');
     }
 };
 
@@ -54,7 +62,7 @@ export const getStudents = async (
 export const createStudent = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { name, email } = req.body;
         const user = (req as any).user;
@@ -62,16 +70,13 @@ export const createStudent = async (
         const userId: string = user?.userId;
 
         if (!name || !email) {
-            res.status(400).json({
-                success: false,
-                message: 'name and email are required'
+            return badRequestResponse(res, 'name and email are required', {
+                required: ['name', 'email']
             });
-            return;
         }
 
         if (!instituteId || !userId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const student = await studentService.createStudent(
@@ -80,15 +85,12 @@ export const createStudent = async (
             userId
         );
 
-        res.status(201).json({
-            success: true,
-            message: 'Student created successfully',
-            data: student
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to create student';
-        const status = message.includes('already exists') ? 409 : 400;
-        res.status(status).json({ success: false, message });
+        return createdResponse(res, student, 'Student created successfully');
+    } catch (error: any) {
+        if (error.message.includes('already exists')) {
+            return conflictResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to create student');
     }
 };
 
@@ -97,7 +99,7 @@ export const createStudent = async (
 export const bulkUploadStudents = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { students } = req.body;
         const user = (req as any).user;
@@ -105,28 +107,16 @@ export const bulkUploadStudents = async (
         const userId: string = user?.userId;
 
         if (!Array.isArray(students) || !students.length) {
-            res.status(400).json({
-                success: false,
-                message: 'students must be a non-empty array'
-            });
-            return;
+            return badRequestResponse(res, 'students must be a non-empty array');
         }
 
-        // Validate each entry has name + email
-        const invalid = students.some(
-            (s: any) => !s.name || !s.email
-        );
+        const invalid = students.some((s: any) => !s.name || !s.email);
         if (invalid) {
-            res.status(400).json({
-                success: false,
-                message: 'Each student must have name and email'
-            });
-            return;
+            return badRequestResponse(res, 'Each student must have name and email');
         }
 
         if (!instituteId || !userId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const result = await studentService.bulkUploadStudents(
@@ -135,19 +125,12 @@ export const bulkUploadStudents = async (
             userId
         );
 
-        res.status(201).json({
-            success: true,
-            message: result.message,
-            data: {
-                createdCount: result.createdCount,
-                skippedCount: result.skippedCount
-            }
-        });
-    } catch (err: any) {
-        res.status(400).json({
-            success: false,
-            message: err?.message || 'Bulk upload failed'
-        });
+        return createdResponse(res, {
+            createdCount: result.createdCount,
+            skippedCount: result.skippedCount
+        }, result.message);
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Bulk upload failed');
     }
 };
 
@@ -156,7 +139,7 @@ export const bulkUploadStudents = async (
 export const deleteStudent = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { id } = req.params;
         const user = (req as any).user;
@@ -164,25 +147,20 @@ export const deleteStudent = async (
         const userId: string = user?.userId;
 
         if (!id) {
-            res.status(400).json({ success: false, message: 'Student ID is required' });
-            return;
+            return badRequestResponse(res, 'Student ID is required');
         }
 
         if (!instituteId || !userId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const deleted = await studentService.deleteStudent(id, instituteId, userId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Student deleted successfully',
-            data: deleted
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to delete student';
-        const status = message === 'Student not found' ? 404 : 400;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, deleted, 'Student deleted successfully');
+    } catch (error: any) {
+        if (error.message === 'Student not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to delete student');
     }
 };

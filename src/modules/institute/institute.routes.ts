@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as instituteController from './institute.controller';
+import { authenticateJWT } from '../../middleware/auth.middleware';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/', instituteController.createInstitute);
+router.post('/', authenticateJWT, instituteController.createInstitute);
 
 // Read
 /**
@@ -94,7 +95,7 @@ router.post('/', instituteController.createInstitute);
  *       500:
  *         description: Internal server error
  */
-router.get('/', instituteController.getAllInstitutes);
+router.get('/', authenticateJWT, instituteController.getAllInstitutes);
 /**
  * @swagger
  * /api/v1/{id}:
@@ -133,7 +134,7 @@ router.get('/', instituteController.getAllInstitutes);
  *       500:
  *         description: Internal server error
  */
-router.get('/:id', instituteController.getInstituteById);
+router.get('/:id', authenticateJWT, instituteController.getInstituteById);
 
 // Update
 /**
@@ -184,7 +185,7 @@ router.get('/:id', instituteController.getInstituteById);
  *       500:
  *         description: Internal server error
  */
-router.put('/:id', instituteController.updateInstitute);
+router.put('/:id', authenticateJWT, instituteController.updateInstitute);
 
 // Soft delete
 /**
@@ -225,6 +226,6 @@ router.put('/:id', instituteController.updateInstitute);
  *       500:
  *         description: Internal server error
  */
-router.delete('/:id', instituteController.deleteInstitute);
+router.delete('/:id', authenticateJWT, instituteController.deleteInstitute);
 
 export default router;

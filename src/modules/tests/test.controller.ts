@@ -1,26 +1,35 @@
 import { Request, Response } from 'express';
 import * as testService from './test.service';
 import { TestStatus } from './test.service';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    forbiddenResponse,
+    conflictResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    calculateSkip,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
-export const createTest = async (req: Request, res: Response): Promise<void> => {
+export const createTest = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { title, description, instituteId } = req.body;
         const user = (req as any).user;
 
         if (!title || !description || !instituteId) {
-            res.status(400).json({
-                success: false,
-                message: 'title, description and instituteId are required'
+            return badRequestResponse(res, 'title, description and instituteId are required', {
+                required: ['title', 'description', 'instituteId']
             });
-            return;
         }
 
         if (!user?.role || !user?.instituteId) {
-            res.status(401).json({
-                success: false,
-                message: 'Unauthorized'
-            });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const test = await testService.createTest({
@@ -33,121 +42,99 @@ export const createTest = async (req: Request, res: Response): Promise<void> => 
             }
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Test created successfully',
-            data: test
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to create test';
-        const status =
-            message.includes('Only ADMIN') ? 403 :
-                message.includes('own institute') ? 403 :
-                    message.includes('Institute not found') ? 404 : 400;
-
-        res.status(status).json({ success: false, message });
+        return createdResponse(res, test, 'Test created successfully');
+    } catch (error: any) {
+        if (error.message.includes('Only ADMIN') || error.message.includes('own institute')) {
+            return forbiddenResponse(res, error.message);
+        }
+        if (error.message === 'Institute not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to create test');
     }
 };
 
 export const getInstituteTests = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const instituteId =
             (req.query.instituteId as string) ||
             (req.params.instituteId as string);
 
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = Math.min(parseInt(req.query.limit as string) || 10, 100);
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
         const search = (req.query.search as string) || '';
         const statusRaw = (req.query.status as string | undefined)?.toUpperCase();
 
         if (!instituteId) {
-            res.status(400).json({
-                success: false,
-                message: 'instituteId is required'
-            });
-            return;
+            return badRequestResponse(res, 'instituteId is required');
         }
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
         let status: TestStatus | undefined;
         if (statusRaw) {
             if (statusRaw !== TestStatus.DRAFT && statusRaw !== TestStatus.PUBLISHED) {
-                res.status(400).json({
-                    success: false,
-                    message: 'status must be DRAFT or PUBLISHED'
-                });
-                return;
+                return badRequestResponse(res, 'status must be DRAFT or PUBLISHED');
             }
             status = statusRaw as TestStatus;
         }
 
+        const safeLimit = Math.min(Number(limit), 100);
         const result = await testService.getInstituteTests({
             instituteId,
-            page,
-            limit,
+            page: Number(page),
+            limit: safeLimit,
             search,
             status
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'Tests fetched successfully',
-            data: result.data,
-            meta: result.meta
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch tests'
-        });
+        const pagination = {
+            page: Number(page),
+            limit: safeLimit,
+            total: result.meta.total,
+            totalPages: result.meta.totalPages,
+            hasNextPage: result.meta.hasNextPage,
+            hasPreviousPage: result.meta.hasPreviousPage
+        };
+
+        return paginatedResponse(res, result.data, pagination, 'Tests fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch tests');
     }
 };
 
 export const getAllTests = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await testService.getAllTests({ page, limit });
+        const skip = calculateSkip(page, limit);
+        const data = await testService.getAllTests({ page: Number(page), limit: Number(limit) });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch tests'
-        });
+        const total = await prisma.psychometricTest.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Tests fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch tests');
     }
 };
 
-export const publishTest = async (req: Request, res: Response): Promise<void> => {
+export const publishTest = async (req: Request, res: Response): Promise<Response> => {
     try {
         const testId = req.params.id;
         const instituteId =
@@ -156,19 +143,11 @@ export const publishTest = async (req: Request, res: Response): Promise<void> =>
         const user = (req as any).user;
 
         if (!testId) {
-            res.status(400).json({
-                success: false,
-                message: 'test id is required'
-            });
-            return;
+            return badRequestResponse(res, 'Test ID is required');
         }
 
         if (!user?.role || !user?.instituteId || !instituteId) {
-            res.status(401).json({
-                success: false,
-                message: 'Unauthorized'
-            });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const test = await testService.publishTest({
@@ -180,24 +159,22 @@ export const publishTest = async (req: Request, res: Response): Promise<void> =>
             }
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'Test published successfully',
-            data: test
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to publish test';
-        const status =
-            message.includes('Only ADMIN') ? 403 :
-                message.includes('own institute') ? 403 :
-                    message.includes('Test not found') ? 404 :
-                        message.includes('already published') ? 409 : 400;
-
-        res.status(status).json({ success: false, message });
+        return successResponse(res, test, 'Test published successfully');
+    } catch (error: any) {
+        if (error.message.includes('Only ADMIN') || error.message.includes('own institute')) {
+            return forbiddenResponse(res, error.message);
+        }
+        if (error.message === 'Test not found') {
+            return notFoundResponse(res, error.message);
+        }
+        if (error.message === 'Test is already published') {
+            return conflictResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to publish test');
     }
 };
 
-export const deleteTest = async (req: Request, res: Response): Promise<void> => {
+export const deleteTest = async (req: Request, res: Response): Promise<Response> => {
     try {
         const testId = req.params.id;
         const instituteId =
@@ -206,19 +183,11 @@ export const deleteTest = async (req: Request, res: Response): Promise<void> => 
         const user = (req as any).user;
 
         if (!testId) {
-            res.status(400).json({
-                success: false,
-                message: 'test id is required'
-            });
-            return;
+            return badRequestResponse(res, 'Test ID is required');
         }
 
         if (!user?.role || !user?.instituteId || !instituteId) {
-            res.status(401).json({
-                success: false,
-                message: 'Unauthorized'
-            });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const test = await testService.deleteTest({
@@ -230,18 +199,14 @@ export const deleteTest = async (req: Request, res: Response): Promise<void> => 
             }
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'Test deleted successfully',
-            data: test
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to delete test';
-        const status =
-            message.includes('Only ADMIN') ? 403 :
-                message.includes('own institute') ? 403 :
-                    message.includes('Test not found') ? 404 : 400;
-
-        res.status(status).json({ success: false, message });
+        return successResponse(res, test, 'Test deleted successfully');
+    } catch (error: any) {
+        if (error.message.includes('Only ADMIN') || error.message.includes('own institute')) {
+            return forbiddenResponse(res, error.message);
+        }
+        if (error.message === 'Test not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to delete test');
     }
 };

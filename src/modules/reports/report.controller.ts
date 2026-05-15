@@ -1,43 +1,53 @@
 import { Request, Response } from 'express';
 import * as reportService from './report.service';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    badRequestResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    calculateSkip,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
-export const getAllReports = async (req: Request, res: Response) => {
+export const getAllReports = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await reportService.getAllReports({ page, limit });
+        const skip = calculateSkip(page, limit);
+        const data = await reportService.getAllReports({ page: Number(page), limit: Number(limit) });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to fetch reports'
-        });
+        const total = await prisma.psychometricTest.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Reports fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch reports');
     }
 };
 
-export const getTestReport = async (req: Request, res: Response) => {
+export const getTestReport = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { id: testId } = req.params;
+
+        if (!testId) {
+            return badRequestResponse(res, 'Test ID is required');
+        }
+
         const report = await reportService.getTestReport(testId);
-        res.json(report);
-    } catch (err: any) {
-        res.status(400).json({ message: err.message });
+        return successResponse(res, report, 'Test report generated successfully');
+    } catch (error: any) {
+        if (error.message === 'Test not found' || error.message === 'testId is required') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to generate test report');
     }
 };

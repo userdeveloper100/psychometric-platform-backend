@@ -1,18 +1,35 @@
 import { Request, Response } from 'express';
 import * as authService from './auth.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    forbiddenResponse,
+    conflictResponse,
+    errorResponse,
+    paginatedResponse,
+    calculatePagination,
+    calculateSkip,
+    validatePagination,
+    handlePrismaError,
+    serverErrorResponse
+} from '../../utils/response-helpers';
+import { ErrorCode } from '../../types/api-response.types';
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+export const register = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { instituteName, email, password } = req.body;
 
         // Validate required fields
         if (!instituteName || !email || !password) {
-            res.status(400).json({
-                success: false,
-                message: 'instituteName, email and password are required'
-            });
-            return;
+            return badRequestResponse(
+                res,
+                'instituteName, email and password are required',
+                { required: ['instituteName', 'email', 'password'] }
+            );
         }
 
         // Extract user context for createdBy (if authenticated)
@@ -28,64 +45,70 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         });
 
         // Return token and user info
-        res.status(201).json({
-            success: true,
-            message: 'Institute admin registered successfully',
-            data: result.user
-        });
-    } catch (err: any) {
-        res.status(400).json({ message: err.message });
+        createdResponse(res, { token: result.token, user: result.user }, 'Institute admin registered successfully');
+    } catch (error: any) {
+        // Handle Prisma errors
+        if (error.code?.startsWith('P')) {
+            const { code, message } = handlePrismaError(error);
+            return errorResponse(res, code, message);
+        }
+
+        // Handle duplicate email error
+        if (error.message === 'Email already registered') {
+            return conflictResponse(res, error.message);
+        }
+
+        serverErrorResponse(res, error.message || 'Failed to register institute admin');
     }
 };
 
 export const login = async (req: Request, res: Response) => {
     try {
-        const result = await authService.login(req.body);
-        res.json(result);
-    } catch (err: any) {
-        res.status(401).json({ message: err.message });
+        const { email, password } = req.body;
+
+        // Validate required fields
+        if (!email || !password) {
+            return badRequestResponse(res, 'email and password are required');
+        }
+
+        const result = await authService.login({ email, password });
+        successResponse(res, result, 'Login successful');
+    } catch (error: any) {
+        // Handle invalid credentials
+        if (error.message === 'Invalid credentials') {
+            return unauthorizedResponse(res, error.message);
+        }
+
+        serverErrorResponse(res, error.message || 'Login failed');
     }
 };
 
-export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
+export const getAllUsers = async (req: Request, res: Response): Promise<Response> => {
     try {
         // Check if user is admin
         const authReq = req as AuthRequest;
         if (!authReq.user || authReq.user.role !== 'ADMIN') {
-            res.status(403).json({
-                success: false,
-                message: 'Access denied. Admin role required.'
-            });
-            return;
+            return forbiddenResponse(res, 'Access denied. Admin role required.');
         }
 
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
         // Validate pagination params
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const users = await authService.getAllUsers({ page, limit });
+        const skip = calculateSkip(page, limit);
+        const users = await authService.getAllUsers({ page: Number(page), limit: Number(limit) });
 
-        res.status(200).json({
-            success: true,
-            message: 'Users fetched successfully',
-            data: users,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to fetch users'
-        });
+        // Calculate total for pagination metadata
+        const total = await prisma.user.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, users, pagination, 'Users fetched successfully');
+    } catch (error: any) {
+        serverErrorResponse(res, error.message || 'Failed to fetch users');
     }
 };

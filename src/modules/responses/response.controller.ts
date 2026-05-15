@@ -1,112 +1,115 @@
 import { Request, Response } from 'express';
 import * as responseService from './response.service';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    calculateSkip,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
 const getUserId = (req: Request): string => {
     const user = (req as any).user;
     return user?.id || user?.userId || 'system';
 };
 
-const handleError = (res: Response, error: unknown) => {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return res.status(400).json({
-        success: false,
-        message
-    });
-};
-
-export const submitResponses = async (req: Request, res: Response) => {
+export const submitResponses = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { token, studentId, responses } = req.body;
         const userId = getUserId(req);
+
+        if (!token || !studentId || !responses || responses.length === 0) {
+            return badRequestResponse(res, 'token, studentId, and responses are required');
+        }
 
         const result = await responseService.submitResponses(
             { token, studentId, responses },
             userId
         );
 
-        return res.status(201).json(result);
-    } catch (error) {
-        return handleError(res, error);
+        return createdResponse(res, result, 'Responses submitted successfully');
+    } catch (error: any) {
+        if (error.message === 'Invalid or inactive invite token' || 
+            error.message === 'Responses already submitted for this invite' ||
+            error.message === 'Student does not match invite') {
+            return badRequestResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to submit responses');
     }
 };
 
-export const getStudentResponses = async (req: Request, res: Response) => {
+export const getStudentResponses = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { studentId } = req.params;
-        const data = await responseService.getStudentResponses(studentId);
 
-        return res.status(200).json({
-            success: true,
-            message: 'Student responses fetched successfully',
-            data
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
-
-export const getTestResponses = async (req: Request, res: Response) => {
-    try {
-        const { testId } = req.params;
-        const data = await responseService.getTestResponses(testId);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Test responses fetched successfully',
-            data
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-};
-
-export const getAllResponses = async (req: Request, res: Response) => {
-    try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
-
-        if (page < 1 || limit < 1) {
-            return res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
+        if (!studentId) {
+            return badRequestResponse(res, 'Student ID is required');
         }
 
-        const data = await responseService.getAllResponses({ page, limit });
-
-        return res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (error) {
-        return handleError(res, error);
+        const data = await responseService.getStudentResponses(studentId);
+        return successResponse(res, data, 'Student responses fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch student responses');
     }
 };
 
-export const deleteResponse = async (req: Request, res: Response) => {
+export const getTestResponses = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const { testId } = req.params;
+
+        if (!testId) {
+            return badRequestResponse(res, 'Test ID is required');
+        }
+
+        const data = await responseService.getTestResponses(testId);
+        return successResponse(res, data, 'Test responses fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch test responses');
+    }
+};
+
+export const getAllResponses = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
+
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
+        }
+
+        const skip = calculateSkip(page, limit);
+        const data = await responseService.getAllResponses({ page: Number(page), limit: Number(limit) });
+
+        const total = await prisma.response.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Responses fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch responses');
+    }
+};
+
+export const deleteResponse = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = getUserId(req);
 
         if (!id) {
-            return res.status(400).json({
-                success: false,
-                message: 'response id is required'
-            });
+            return badRequestResponse(res, 'Response ID is required');
         }
 
         const result = await responseService.deleteResponse(id, userId);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Response deleted successfully',
-            data: result
-        });
-    } catch (error) {
-        return handleError(res, error);
+        return successResponse(res, result, 'Response deleted successfully');
+    } catch (error: any) {
+        if (error.message === 'Response not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to delete response');
     }
 };

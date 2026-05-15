@@ -1,43 +1,43 @@
 import { Request, Response } from 'express';
 import * as instituteService from './institute.service';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    conflictResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    calculateSkip,
+    serverErrorResponse
+} from '../../utils/response-helpers';
+import { ErrorCode } from '../../types/api-response.types';
 
 // ─── Create Institute ─────────────────────────────────────────────────────────
 
 export const createInstitute = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { name, email } = req.body;
 
-        // Validate required fields
         if (!name || !email) {
-            res.status(400).json({
-                success: false,
-                message: 'name and email are required'
+            return badRequestResponse(res, 'name and email are required', {
+                required: ['name', 'email']
             });
-            return;
         }
 
         const institute = await instituteService.createInstitute({ name, email });
 
-        res.status(201).json({
-            success: true,
-            message: 'Institute created successfully',
-            data: institute
-        });
-    } catch (err: any) {
-        if (err.message === 'Institute with this email already exists') {
-            res.status(409).json({
-                success: false,
-                message: err.message
-            });
-            return;
+        return createdResponse(res, institute, 'Institute created successfully');
+    } catch (error: any) {
+        if (error.message === 'Institute with this email already exists') {
+            return conflictResponse(res, error.message);
         }
-        res.status(400).json({
-            success: false,
-            message: err.message || 'Failed to create institute'
-        });
+        return serverErrorResponse(res, error.message || 'Failed to create institute');
     }
 };
 
@@ -46,75 +46,62 @@ export const createInstitute = async (
 export const getInstitutes = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = parseInt(req.query.limit as string) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
         const search = (req.query.search as string) || '';
 
-        // Validate pagination params
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        // Cap limit to 100 to prevent large queries
-        const safeLimitCap = Math.min(limit, 100);
+        const safeLimitCap = Math.min(Number(limit), 100);
 
         const result = await instituteService.getInstitutes({
-            page,
+            page: Number(page),
             limit: safeLimitCap,
             search
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'Institutes fetched successfully',
-            data: result.data,
-            meta: result.meta
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to fetch institutes'
-        });
+        const pagination = {
+            page: Number(page),
+            limit: safeLimitCap,
+            total: result.meta.total,
+            totalPages: result.meta.totalPages,
+            hasNextPage: result.meta.hasNextPage,
+            hasPreviousPage: result.meta.hasPreviousPage
+        };
+
+        return paginatedResponse(res, result.data, pagination, 'Institutes fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch institutes');
     }
 };
 
 export const getAllInstitutes = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await instituteService.getAllInstitutes({ page, limit });
+        const skip = calculateSkip(page, limit);
+        const data = await instituteService.getAllInstitutes({ page: Number(page), limit: Number(limit) });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to fetch institutes'
-        });
+        const total = await prisma.institute.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Institutes fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch institutes');
     }
 };
 
@@ -123,38 +110,22 @@ export const getAllInstitutes = async (
 export const getInstituteById = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { id } = req.params;
 
-        // Validate ID presence
         if (!id) {
-            res.status(400).json({
-                success: false,
-                message: 'Institute ID is required'
-            });
-            return;
+            return badRequestResponse(res, 'Institute ID is required');
         }
 
         const institute = await instituteService.getInstituteById(id);
 
-        res.status(200).json({
-            success: true,
-            message: 'Institute fetched successfully',
-            data: institute
-        });
-    } catch (err: any) {
-        if (err.message === 'Institute not found') {
-            res.status(404).json({
-                success: false,
-                message: err.message
-            });
-            return;
+        return successResponse(res, institute, 'Institute fetched successfully');
+    } catch (error: any) {
+        if (error.message === 'Institute not found') {
+            return notFoundResponse(res, error.message);
         }
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Failed to fetch institute'
-        });
+        return serverErrorResponse(res, error.message || 'Failed to fetch institute');
     }
 };
 
@@ -163,37 +134,34 @@ const getUserId = (req: Request): string => {
     return user?.id || user?.userId || 'system';
 };
 
-export const updateInstitute = async (req: Request, res: Response) => {
+export const updateInstitute = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = getUserId(req);
 
         const institute = await instituteService.updateInstitute(id, req.body, userId);
 
-        return res.status(200).json({
-            success: true,
-            message: 'Institute updated successfully',
-            data: institute
-        });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to update institute';
-        return res.status(400).json({ success: false, message });
+        return successResponse(res, institute, 'Institute updated successfully');
+    } catch (error: any) {
+        if (error.message === 'Institute not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to update institute');
     }
 };
 
-export const deleteInstitute = async (req: Request, res: Response) => {
+export const deleteInstitute = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = getUserId(req);
 
-        await instituteService.deleteInstitute(id, userId);
+        const result = await instituteService.deleteInstitute(id, userId);
 
-        return res.status(200).json({
-            success: true,
-            message: 'Institute deleted successfully'
-        });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to delete institute';
-        return res.status(400).json({ success: false, message });
+        return successResponse(res, result, 'Institute deleted successfully');
+    } catch (error: any) {
+        if (error.message === 'Institute not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to delete institute');
     }
 };
