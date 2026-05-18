@@ -1,0 +1,29 @@
+Epic ID,Epic Title,Story ID,Story Title,Story Type,User Type,Capability,Value Benefit,Acceptance Criteria Count,Effort Estimate,Priority,Phase,Status
+E1,Foundation - Multi-Tenant Platform,1.1,Organization Registration & Setup,Story,Organization Administrator,Register organization with custom branding,Dedicated workspace with company identity,3,5-8 days,P0,Phase 1,Ready
+E1,Foundation - Multi-Tenant Platform,1.2,User Invitation & Management,Story,Organization Admin,Invite and manage team members,Right people have access to platform,4,5-8 days,P0,Phase 1,Ready
+E1,Foundation - Multi-Tenant Platform,1.3,Role-Based Access Control Implementation,Story,Platform Architect,Enforce RBAC permissions,Users only access appropriate features,4,8-10 days,P0,Phase 1,Ready
+E1,Foundation - Multi-Tenant Platform,1.4,Audit Logging for Compliance,Story,Compliance Officer,Log all critical actions,Demonstrate GDPR and SOC 2 compliance,4,8-10 days,P0,Phase 1,Ready
+E1,Foundation - Multi-Tenant Platform,1.5,Multi-Tenant Data Isolation,Story,Security Architect,Ensure data isolation,No data leaks between organizations,4,8-10 days,P0,Phase 1,Ready
+E1,Foundation - Multi-Tenant Platform,1.6,Session Management & Token Refresh,Story,Security Engineer,Implement secure JWT management,Secure sessions without risk,4,8-10 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.1,Question Bank CRUD Operations,Story,Assessment Creator,Create and organize question bank,Reuse questions across assessments,5,8-10 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.2,Assessment Creation & Configuration,Story,HR Manager,Create and configure assessments,Tailor assessments to roles/skills,5,10-12 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.3,Assessment Versioning,Story,Assessment Designer,Create assessment versions,Improve assessments without breaking data,4,8-10 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.4,Question Randomization,Story,Assessment Administrator,Randomize question order,Prevent predictable memorization,4,5-8 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.5,Timed Assessments with Progress Tracking,Story,Psychometric Expert,Enforce time limits,Consistent time pressure,5,8-10 days,P0,Phase 1,Ready
+E2,Assessment Management & Core Engine,2.6,Assessment Templates,Story,HR Manager,Use pre-built templates,Quickly create standardized assessments,4,5-8 days,P0,Phase 1,Ready
+E3,Assessment Delivery & Candidate Experience,3.1,Candidate Invitation & Portal,Story,Recruiter,Send invitations to candidates,Candidates can access assessments,4,8-10 days,P0,Phase 1,Ready
+E3,Assessment Delivery & Candidate Experience,3.2,Assessment Session Initialization,Story,Candidate,Start assessment with clear instructions,Understand expectations before beginning,4,5-8 days,P0,Phase 1,Ready
+E3,Assessment Delivery & Candidate Experience,3.3,Question Rendering & Response Collection,Story,Candidate,Answer questions and save responses,Responses captured correctly,5,10-12 days,P0,Phase 1,Ready
+E3,Assessment Delivery & Candidate Experience,3.4,Assessment Submission & Confirmation,Story,Candidate,Submit assessment confidently,Know responses are recorded,5,8-10 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.1,Assessment Result Aggregation & Scoring,Story,Psychometric Specialist,Automatically score responses,Results available immediately,4,10-12 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.2,Candidate Report Generation,Story,HR Manager,Generate detailed reports,Understand candidate performance,5,10-12 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.3,Comparative Candidate Analytics,Story,Recruiter,Compare multiple candidates,Make informed hiring decisions,4,8-10 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.4,Organization Dashboard & Metrics,Story,Organization Administrator,See organization-level metrics,Monitor hiring pipeline and usage,4,10-12 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.5,Real-Time Assessment Monitoring,Story,HR Manager,Monitor assessments in progress,See real-time candidate activity,4,8-10 days,P0,Phase 1,Ready
+E4,Reporting & Analytics Foundation,4.6,PDF Report with AI-Generated Insights,Story,Hiring Manager,Generate AI-powered reports,Understand strengths without manual analysis,4,10-12 days,P0,Phase 1,Ready
+E5,Performance & Technical Excellence,5.1,Redis Caching Layer Implementation,Story,Platform Engineer,Implement caching for high-traffic data,Reduce database load and improve response time,4,8-10 days,P1,Phase 1,Ready
+E5,Performance & Technical Excellence,5.2,Database Query Optimization,Story,Database Administrator,Optimize slow queries,Response times meet <500ms target,3,10-12 days,P1,Phase 1,Ready
+E5,Performance & Technical Excellence,5.3,Connection Pooling for Database,Story,DevOps Engineer,Implement connection pooling,Efficiently reuse database connections,3,5-8 days,P1,Phase 1,Ready
+E5,Performance & Technical Excellence,5.4,API Documentation with Swagger,Story,Frontend Developer,Comprehensive API documentation,Integrate with backend without guessing,4,5-8 days,P1,Phase 1,Ready
+E5,Performance & Technical Excellence,5.5,Unit Test Infrastructure & Coverage,Story,QA Engineer,70%+ test coverage for critical code,Ship with confidence,4,10-12 days,P1,Phase 1,Ready
+E5,Performance & Technical Excellence,5.6,Integration Testing Framework,Story,Backend Developer,Integration tests for API endpoints,Verify full request/response workflows,4,8-10 days,P1,Phase 1,Ready

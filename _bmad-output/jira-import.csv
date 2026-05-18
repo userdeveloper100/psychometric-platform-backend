@@ -1,0 +1,113 @@
+Summary,Type,Project key,Assignee,Priority,Epic Name,Story Points,Description,Acceptance Criteria
+[E1-1] Organization Registration & Setup,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,8,"As an organization administrator, I want to register my organization on the platform with custom branding, So that my team has a dedicated workspace with our company identity.","AC1: No org exists - Complete registration form - New org created with isolated DB, user assigned Super Admin
+AC2: Org admin - Upload logo/color - Branding applied to pages, included in PDF reports
+AC3: Org created - System initializes - Default roles created, audit logging enabled"
+[E1-2] User Invitation & Management,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,8,"As an organization admin, I want to invite team members and manage their accounts, So that the right people have access to the platform.","AC1: Org admin - Enter email/role - Invitation sent, unique link valid 7 days, user pending
+AC2: User receives email - Click link - Auto-added to org, assigned role, status active
+AC3: Org admin in user mgmt - View list - All users displayed, can deactivate (soft delete)
+AC4: User deactivated - Try login - Receive not found message, data remains intact"
+[E1-3] Role-Based Access Control Implementation,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,13,"As a platform architect, I want RBAC to enforce permissions based on user roles, So that users only access features and data appropriate to their role.","AC1: HR Manager - Make API request - RBAC middleware checks permission - Proceeds or 403
+AC2: RBAC defined - Candidate tries Create Assessment - Request rejected with 403, logged
+AC3: Super Admin - Create custom role - Permissions saved, users assignable
+AC4: Org Admin - View role mgmt - See permission matrix, modify (except Super Admin)"
+[E1-4] Audit Logging for Compliance,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,13,"As a compliance officer, I want comprehensive audit logs of all critical actions, So that we can demonstrate compliance with GDPR and SOC 2.","AC1: Sensitive action - Completes - Log created: timestamp, user, action, resource, result, IP
+AC2: Org admin - Filter logs by date/action - Matching logs displayed, can export CSV
+AC3: Sensitive operation - Logged - Entry includes before/after values, user identified
+AC4: Logs >90 days - Retention policy runs - Older logs archived, current logs searchable"
+[E1-5] Multi-Tenant Data Isolation,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,13,"As a security architect, I want to ensure organizations' data is completely isolated, So that no data leaks between organizations.","AC1: Org A user - Make API request - Query auto-includes WHERE org_id, no other org data
+AC2: Two orgs - Same user name - Each sees only their John Smith, no inference possible
+AC3: Org Admin - Try access other org data - Request fails with unauthorized, logged
+AC4: Prisma query - Multi-tenant table - Middleware adds org_id filter, dev can't bypass"
+[E1-6] Session Management & Token Refresh,Story,PSYCH,,High,Foundation - Multi-Tenant Platform,13,"As a security engineer, I want secure JWT token management with refresh capability, So that user sessions are secure and long-lasting without security risk.","AC1: User login - Correct credentials - Access token 15-30min, refresh token 7 days, stored securely
+AC2: Access token expires - API request - 401 Unauthorized, client can use refresh token
+AC3: User refresh - Valid token - New access token + refresh token issued, old invalidated
+AC4: User logout - Logout request - Refresh token revoked, old token fails, session logged"
+[E2-1] Question Bank CRUD Operations,Story,PSYCH,,High,Assessment Management & Core Engine,8,"As an assessment creator, I want to create and organize a question bank, So that I can reuse questions across multiple assessments.","AC1: HR Manager - Create New Question - Form opens, question saved with UUID/timestamp
+AC2: Multiple Choice - Add options - Correct answer marked internally (hidden)
+AC3: View question bank - Search/filter - Matching questions displayed, edit available
+AC4: Try delete question - Used in assessments - System prevents, offers deprecate option"
+[E2-2] Assessment Creation & Configuration,Story,PSYCH,,High,Assessment Management & Core Engine,21,"As an HR Manager, I want to create assessments by selecting questions and configuring settings, So that I can tailor assessments to specific roles or skill levels.","AC1: Click Create - Enter details - Assessment created in draft status
+AC2: Assessment builder - Search/add questions - Questions editable, order/randomization set
+AC3: Configure settings - Set time limit - Setting saved, enforced in delivery
+AC4: Review preview - Check assessment - See as candidates will, identify issues
+AC5: Publish assessment - Status active - Appears in invitations, versions managed (v1.0)"
+[E2-3] Assessment Versioning,Story,PSYCH,,High,Assessment Management & Core Engine,13,"As an assessment designer, I want to create new versions of assessments, So that I can improve assessments without breaking historical data.","AC1: Published assessment - Create New Version - Draft v1.1 created, questions copied
+AC2: Modify v1.1 - Publish - v1.1 active, v1.0 archived, new invites use v1.1
+AC3: View reports - Candidates v1.0 - Report shows version, scoring from that version
+AC4: View history - Select All Versions - All versions shown (active/archived/draft), can restore"
+[E2-4] Question Randomization,Story,PSYCH,,High,Assessment Management & Core Engine,8,"As an assessment administrator, I want to randomize question order, So that candidates cannot predictably memorize the assessment.","AC1: Enable Randomize - Assessment configured - Flag set in config
+AC2: Candidate accesses - Randomization enabled - Questions in random order (seeded by session)
+AC3: Two candidates - Same assessment - Questions may differ per candidate, both scored correctly
+AC4: Reports generated - Randomization enabled - Report shows actual order, consistent scoring"
+[E2-5] Timed Assessments with Progress Tracking,Story,PSYCH,,High,Assessment Management & Core Engine,13,"As a psychometric expert, I want to enforce time limits on assessments, So that time pressure is consistent across all candidates.","AC1: 30-min limit - Start assessment - Countdown 30:00, displayed, updates each second
+AC2: 5 min remain - Timer displays - Color yellow (warning)
+AC3: 1 min remain - Timer counts - Color red, warning message
+AC4: Timer 0:00 - Time expires - Assessment auto-submitted, unsaved responses discarded
+AC5: Last question - Click Submit - Submitted immediately, time spent recorded (25 min)"
+[E2-6] Assessment Templates,Story,PSYCH,,High,Assessment Management & Core Engine,8,"As an HR Manager, I want to use pre-built assessment templates, So that I can quickly create standardized assessments.","AC1: Select Create from Template - Browse templates - Templates with descriptions visible
+AC2: Select template - Click Use - New assessment created in draft, customizable
+AC3: Custom assessment published - Option Save as Template - Saved for other admins
+AC4: Other admins - Can use custom template - Available in template list"
+[E3-1] Candidate Invitation & Portal,Story,PSYCH,,High,Assessment Delivery & Candidate Experience,13,"As a recruiter, I want to send assessment invitations to candidates, So that candidates can access and complete their assessments.","AC1: Enter emails/assessment - Send invites - Personalized emails sent, unique links 30 days
+AC2: Click link - Not logged in - Login/register option, or if logged in - Assessment loads
+AC3: View assessment list - Portal - All assigned assessments shown, status + deadline
+AC4: Link expired - Try access - Expired message, contact recruiter instruction"
+[E3-2] Assessment Session Initialization,Story,PSYCH,,High,Assessment Delivery & Candidate Experience,8,"As a candidate, I want to start an assessment and see clear instructions, So that I understand what's expected before I begin.","AC1: Click Start Assessment - First time - Instructions page appears
+AC2: Read instructions - Click Begin - First question loads, timer starts, in progress
+AC3: Already started - Click resume - Direct to next unanswered question, timer resumes
+AC4: No go-back allowed - Try navigate back - Message: cannot go back"
+[E3-3] Question Rendering & Response Collection,Story,PSYCH,,High,Assessment Delivery & Candidate Experience,21,"As a candidate, I want to answer questions clearly and save my responses, So that my answers are captured correctly.","AC1: View question - Loads - Question text clear, answer options per type, counter shown
+AC2: Select answer - Selection highlighted - Response auto-saved, saved indicator
+AC3: Free-text question - Type/timer running - Text auto-saved every 10 seconds
+AC4: Click Next Question - Current saved - Advance to next, progress updates
+AC5: Connection lost - Restored - Unsaved responses synced, continue without data loss"
+[E3-4] Assessment Submission & Confirmation,Story,PSYCH,,High,Assessment Delivery & Candidate Experience,13,"As a candidate, I want to submit my assessment confidently, So that I know my responses have been recorded.","AC1: Click Submit - Confirmation dialog - Are you sure? Cannot change after
+AC2: Confirm submission - Processing - Responses locked, submission_time recorded, status completed
+AC3: Submit succeeds - Thanks page - Confirmation shown, next steps, report timing
+AC4: Submit fails - Network error - Failed message with retry, responses preserved
+AC5: Submit succeeds - Backend processes - Responses validated, scoring triggered async"
+[E4-1] Assessment Result Aggregation & Scoring,Story,PSYCH,,High,Reporting & Analytics Foundation,21,"As a psychometric specialist, I want assessment responses to be automatically scored, So that results are available immediately after submission.","AC1: Submit assessment - Completes - Scoring job queued async, candidate not blocked
+AC2: Scoring job runs - Process responses - Each response evaluated, score calculated, stored
+AC3: Assessed - Viewed - Result shows: total score, percentage, individual scores
+AC4: Multiple candidates - Results aggregated - Statistical data calculated: avg, distribution, percentile"
+[E4-2] Candidate Report Generation,Story,PSYCH,,High,Reporting & Analytics Foundation,21,"As an HR Manager, I want to generate detailed reports for individual candidates, So that I can understand candidate performance in depth.","AC1: Assessment scored - View results - Report displayed: score, time, correct/incorrect, strengths/weaknesses
+AC2: In report - Click Export PDF - PDF generated: name, score, percentile, breakdown, charts, timestamp
+AC3: PDF generated - Includes branding - Logo, colors professional, shareable
+AC4: Request report - PDF processing - Job queued, user notified when ready, downloadable"
+[E4-3] Comparative Candidate Analytics,Story,PSYCH,,High,Reporting & Analytics Foundation,13,"As a recruiter, I want to compare multiple candidates' performance, So that I can make informed hiring decisions.","AC1: Select multiple candidates - Comparison view - Side-by-side scores, rankings visible
+AC2: Filter by assessment - Only matching - Candidates displayed, scores comparable
+AC3: Compare performances - View profiles - Score, percentile, topic breakdown
+AC4: Export comparison - Download CSV/PDF - File includes all data"
+[E4-4] Organization Dashboard & Metrics,Story,PSYCH,,High,Reporting & Analytics Foundation,21,"As an organization administrator, I want to see organization-level metrics, So that I can monitor hiring pipeline and platform usage.","AC1: Dashboard loads - See metrics - Cards: completions, pass rate, avg score, active candidates
+AC2: Click metric - Detail view - Trends over time, 7/30/90 day filters, export option
+AC3: Filter by type/date - Dashboard updates - Metrics recalculated without reload
+AC4: Data changes - Dashboard open - Metrics refresh every 5min, real-time updates"
+[E4-5] Real-Time Assessment Monitoring,Story,PSYCH,,High,Reporting & Analytics Foundation,13,"As an HR Manager, I want to monitor assessments in progress, So that I can see real-time candidate activity and identify issues.","AC1: Live Monitoring dashboard - Loads - List of candidates in progress, name/assessment/question/time
+AC2: Candidates in progress - View dashboard - Data updates every 5 seconds, real-time
+AC3: Click candidate - Session details - Questions answered, current question, responses visible
+AC4: Connection lost - Alert appears - No activity for 2 min shown, can contact candidate"
+[E4-6] PDF Report with AI-Generated Insights,Story,PSYCH,,High,Reporting & Analytics Foundation,21,"As a hiring manager, I want AI-generated insights in reports, So that I understand candidate strengths and weaknesses without manual analysis.","AC1: Assessment scored - Report generated - AI analysis triggered, insights queued async
+AC2: Export PDF - Includes AI insights - Sections: performance, AI summary, strengths, development areas, recommendations
+AC3: Insights generated - Based on data - Factually based, traceable to assessment questions
+AC4: Multiple reports - Queued - Analysis async (no blocking), available when ready"
+[E5-1] Redis Caching Layer Implementation,Story,PSYCH,,High,Performance & Technical Excellence,13,"As a platform engineer, I want to implement caching for high-traffic data, So that database load is reduced and API responses are faster.","AC1: Read request - Cache checked first - Cache hit returns <50ms, miss queries database
+AC2: Data created/updated - PostgreSQL saved - Redis cache invalidated, next request fresh
+AC3: Cache full - New data - LRU entries evicted, new data cached with 1hr TTL
+AC4: Redis fails - Unavailable - System falls back to database, no errors, warning logged"
+[E5-2] Database Query Optimization,Story,PSYCH,,High,Performance & Technical Excellence,13,"As a database administrator, I want to optimize slow queries, So that response times meet the <500ms target.","AC1: Slow queries identified - >500ms - Analysis performed, execution plans reviewed, indexes identified
+AC2: Indexes needed - Migrations created - Strategic indexes added, performance tested
+AC3: Queries optimized - Execute - Resource usage reduced, <500ms 95th percentile consistent"
+[E5-3] Connection Pooling for Database,Story,PSYCH,,High,Performance & Technical Excellence,8,"As a devops engineer, I want to implement connection pooling, So that database connections are efficiently reused.","AC1: Application starts - Pooling initialized - 10-50 connections created, reused, overhead minimized
+AC2: All connections busy - New request - Waits for available (with timeout), error if timeout
+AC3: Pooling active - Monitor - Metrics shown: active, idle, wait time in dashboards"
+[E5-4] API Documentation with Swagger,Story,PSYCH,,High,Performance & Technical Excellence,8,"As a frontend developer, I want comprehensive API documentation, So that I can integrate with the backend without guessing endpoints.","AC1: Access Swagger UI - All endpoints shown - Organized by resource, method/path/params/response
+AC2: Expand endpoint - Docs visible - Description, examples, errors, Try It Out available
+AC3: API changes - Docs update - JSDoc comments generate, automatically synced
+AC4: Access Swagger UI - Current docs - Always latest, never out of sync"
+[E5-5] Unit Test Infrastructure & Coverage,Story,PSYCH,,High,Performance & Technical Excellence,21,"As a QA engineer, I want 70%+ test coverage for critical code, So that we can ship with confidence.","AC1: Tests written - Run Jest - All pass, coverage report generated
+AC2: Coverage analyzed - Critical >=70%, utilities >=50% - Report visible in CI/CD
+AC3: New code committed - Pre-commit hooks - Unit tests run, coverage drop fails commit
+AC4: Mock data - Tests run - Mocks consistent/reusable, tests isolated (not dependent)"
+[E5-6] Integration Testing Framework,Story,PSYCH,,High,Performance & Technical Excellence,13,"As a backend developer, I want integration tests for API endpoints, So that I can verify full request/response workflows.","AC1: Integration tests written - Supertest - Real HTTP request, response verification (code/body/headers)
+AC2: Database involved - Tests run - Test database used, data seeded/cleaned per test
+AC3: Tests running - Complete - All pass consistently, <10sec total, results in CI/CD"
