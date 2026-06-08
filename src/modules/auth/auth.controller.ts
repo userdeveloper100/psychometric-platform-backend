@@ -45,7 +45,7 @@ export const register = async (req: Request, res: Response): Promise<Response> =
         });
 
         // Return token and user info
-        createdResponse(res, { token: result.token, user: result.user }, 'Institute admin registered successfully');
+        return createdResponse(res, { token: result.token, user: result.user }, 'Institute admin registered successfully');
     } catch (error: any) {
         // Handle Prisma errors
         if (error.code?.startsWith('P')) {
@@ -58,7 +58,7 @@ export const register = async (req: Request, res: Response): Promise<Response> =
             return conflictResponse(res, error.message);
         }
 
-        serverErrorResponse(res, error.message || 'Failed to register institute admin');
+        return serverErrorResponse(res, error.message || 'Failed to register institute admin');
     }
 };
 
@@ -72,14 +72,14 @@ export const login = async (req: Request, res: Response) => {
         }
 
         const result = await authService.login({ email, password });
-        successResponse(res, result, 'Login successful');
+        return successResponse(res, result, 'Login successful');
     } catch (error: any) {
         // Handle invalid credentials
         if (error.message === 'Invalid credentials') {
             return unauthorizedResponse(res, error.message);
         }
 
-        serverErrorResponse(res, error.message || 'Login failed');
+        return serverErrorResponse(res, error.message || 'Login failed');
     }
 };
 
@@ -109,6 +109,6 @@ export const getAllUsers = async (req: Request, res: Response): Promise<Response
 
         return paginatedResponse(res, users, pagination, 'Users fetched successfully');
     } catch (error: any) {
-        serverErrorResponse(res, error.message || 'Failed to fetch users');
+        return serverErrorResponse(res, error.message || 'Failed to fetch users');
     }
 };

@@ -1,26 +1,35 @@
 import { Request, Response } from 'express';
 import * as dimensionService from './dimension.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
 export const createDimension = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { testId } = req.params;
         const { name, description } = req.body;
 
         if (!testId) {
-            res.status(400).json({ success: false, message: 'testId is required' });
-            return;
+            return badRequestResponse(res, 'testId is required');
         }
 
         if (!name || !description) {
-            res.status(400).json({
-                success: false,
-                message: 'name and description are required'
+            return badRequestResponse(res, 'name and description are required', {
+                required: ['name', 'description']
             });
-            return;
         }
 
         const dimension = await dimensionService.createDimension(testId, {
@@ -28,106 +37,87 @@ export const createDimension = async (
             description
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Dimension created successfully',
-            data: dimension
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to create dimension';
-        const status = message === 'Test not found' ? 404 : 400;
-        res.status(status).json({ success: false, message });
+        return createdResponse(res, dimension, 'Dimension created successfully');
+    } catch (error: any) {
+        if (error.message === 'Test not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to create dimension');
     }
 };
 
 export const getTestDimensions = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { testId } = req.params;
 
         if (!testId) {
-            res.status(400).json({ success: false, message: 'testId is required' });
-            return;
+            return badRequestResponse(res, 'testId is required');
         }
 
         const dimensions = await dimensionService.getTestDimensions(testId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Dimensions fetched successfully',
-            data: dimensions
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to fetch dimensions';
-        const status = message === 'Test not found' ? 404 : 500;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, dimensions, 'Dimensions fetched successfully');
+    } catch (error: any) {
+        if (error.message === 'Test not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to fetch dimensions');
     }
 };
 
 export const getAllDimensions = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await dimensionService.getAllDimensions({ page, limit });
+        const data = await dimensionService.getAllDimensions({
+            page: Number(page),
+            limit: Number(limit)
+        });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch dimensions'
-        });
+        const total = await prisma.dimension.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Dimensions fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch dimensions');
     }
 };
 
 export const deleteDimension = async (
     req: AuthRequest,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = req.user?.userId;
 
         if (!id) {
-            res.status(400).json({ success: false, message: 'dimension id is required' });
-            return;
+            return badRequestResponse(res, 'dimension id is required');
         }
 
         if (!userId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const deleted = await dimensionService.deleteDimension(id, userId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Dimension deleted successfully',
-            data: deleted
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to delete dimension';
-        const status = message === 'Dimension not found' ? 404 : 400;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, deleted, 'Dimension deleted successfully');
+    } catch (error: any) {
+        if (error.message === 'Dimension not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to delete dimension');
     }
 };

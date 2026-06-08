@@ -1,23 +1,33 @@
 import { Request, Response } from 'express';
 import * as questionService from './question.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
 export const createQuestion = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { dimensionId } = req.params;
         const { text, scaleMin, scaleMax } = req.body;
 
         if (!dimensionId) {
-            res.status(400).json({ success: false, message: 'dimensionId is required' });
-            return;
+            return badRequestResponse(res, 'dimensionId is required');
         }
 
         if (!text || typeof text !== 'string') {
-            res.status(400).json({ success: false, message: 'text is required' });
-            return;
+            return badRequestResponse(res, 'text is required', { required: ['text'] });
         }
 
         const question = await questionService.createQuestion(dimensionId, {
@@ -26,106 +36,87 @@ export const createQuestion = async (
             scaleMax
         });
 
-        res.status(201).json({
-            success: true,
-            message: 'Question created successfully',
-            data: question
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to create question';
-        const status = message === 'Dimension not found' ? 404 : 400;
-        res.status(status).json({ success: false, message });
+        return createdResponse(res, question, 'Question created successfully');
+    } catch (error: any) {
+        if (error.message === 'Dimension not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to create question');
     }
 };
 
 export const getDimensionQuestions = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { dimensionId } = req.params;
 
         if (!dimensionId) {
-            res.status(400).json({ success: false, message: 'dimensionId is required' });
-            return;
+            return badRequestResponse(res, 'dimensionId is required');
         }
 
         const questions = await questionService.getDimensionQuestions(dimensionId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Questions fetched successfully',
-            data: questions
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to fetch questions';
-        const status = message === 'Dimension not found' ? 404 : 500;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, questions, 'Questions fetched successfully');
+    } catch (error: any) {
+        if (error.message === 'Dimension not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to fetch questions');
     }
 };
 
 export const getAllQuestions = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await questionService.getAllQuestions({ page, limit });
+        const data = await questionService.getAllQuestions({
+            page: Number(page),
+            limit: Number(limit)
+        });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch questions'
-        });
+        const total = await prisma.question.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Questions fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch questions');
     }
 };
 
 export const deleteQuestion = async (
     req: AuthRequest,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = req.user?.userId;
 
         if (!id) {
-            res.status(400).json({ success: false, message: 'question id is required' });
-            return;
+            return badRequestResponse(res, 'question id is required');
         }
 
         if (!userId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const deleted = await questionService.deleteQuestion(id, userId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Question deleted successfully',
-            data: deleted
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to delete question';
-        const status = message === 'Question not found' ? 404 : 400;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, deleted, 'Question deleted successfully');
+    } catch (error: any) {
+        if (error.message === 'Question not found') {
+            return notFoundResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to delete question');
     }
 };

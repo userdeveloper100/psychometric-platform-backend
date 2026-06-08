@@ -1,12 +1,26 @@
 import { Request, Response } from 'express';
 import * as inviteService from './invite.service';
+import prisma from '../../config/prisma';
+import {
+    successResponse,
+    createdResponse,
+    badRequestResponse,
+    unauthorizedResponse,
+    forbiddenResponse,
+    conflictResponse,
+    notFoundResponse,
+    paginatedResponse,
+    validatePagination,
+    calculatePagination,
+    serverErrorResponse
+} from '../../utils/response-helpers';
 
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
 export const inviteStudents = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { testId } = req.params;
         const { studentIds } = req.body;
@@ -15,21 +29,15 @@ export const inviteStudents = async (
         const instituteId: string = user?.instituteId;
 
         if (!testId) {
-            res.status(400).json({ success: false, message: 'testId is required' });
-            return;
+            return badRequestResponse(res, 'testId is required');
         }
 
         if (!Array.isArray(studentIds) || !studentIds.length) {
-            res.status(400).json({
-                success: false,
-                message: 'studentIds must be a non-empty array'
-            });
-            return;
+            return badRequestResponse(res, 'studentIds must be a non-empty array');
         }
 
         if (!userId || !instituteId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const result = await inviteService.inviteStudents(
@@ -39,17 +47,19 @@ export const inviteStudents = async (
             instituteId
         );
 
-        res.status(201).json({
-            success: true,
-            message: `${result.created} student(s) invited, ${result.skipped} skipped`,
-            data: result
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to invite students';
-        const status =
-            message.includes('not found') ? 404 :
-                message.includes('access denied') ? 403 : 400;
-        res.status(status).json({ success: false, message });
+        return createdResponse(
+            res,
+            result,
+            `${result.created} student(s) invited, ${result.skipped} skipped`
+        );
+    } catch (error: any) {
+        if (error.message.includes('not found')) {
+            return notFoundResponse(res, error.message);
+        }
+        if (error.message.includes('access denied')) {
+            return forbiddenResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to invite students');
     }
 };
 
@@ -58,35 +68,31 @@ export const inviteStudents = async (
 export const getTestInvites = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { testId } = req.params;
         const user = (req as any).user;
         const instituteId: string = user?.instituteId;
 
         if (!testId) {
-            res.status(400).json({ success: false, message: 'testId is required' });
-            return;
+            return badRequestResponse(res, 'testId is required');
         }
 
         if (!instituteId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const invites = await inviteService.getTestInvites(testId, instituteId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Test invites fetched successfully',
-            data: invites
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to fetch test invites';
-        const status =
-            message.includes('not found') ? 404 :
-                message.includes('access denied') ? 403 : 500;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, invites, 'Test invites fetched successfully');
+    } catch (error: any) {
+        if (error.message.includes('not found')) {
+            return notFoundResponse(res, error.message);
+        }
+        if (error.message.includes('access denied')) {
+            return forbiddenResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to fetch test invites');
     }
 };
 
@@ -95,20 +101,18 @@ export const getTestInvites = async (
 export const getStudentInvites = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { studentId } = req.params;
         const user = (req as any).user;
         const instituteId: string = user?.instituteId;
 
         if (!studentId) {
-            res.status(400).json({ success: false, message: 'studentId is required' });
-            return;
+            return badRequestResponse(res, 'studentId is required');
         }
 
         if (!instituteId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const invites = await inviteService.getStudentInvites(
@@ -116,51 +120,42 @@ export const getStudentInvites = async (
             instituteId
         );
 
-        res.status(200).json({
-            success: true,
-            message: 'Student invites fetched successfully',
-            data: invites
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to fetch student invites';
-        const status =
-            message.includes('not found') ? 404 :
-                message.includes('access denied') ? 403 : 500;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, invites, 'Student invites fetched successfully');
+    } catch (error: any) {
+        if (error.message.includes('not found')) {
+            return notFoundResponse(res, error.message);
+        }
+        if (error.message.includes('access denied')) {
+            return forbiddenResponse(res, error.message);
+        }
+        return serverErrorResponse(res, error.message || 'Failed to fetch student invites');
     }
 };
 
 export const getAllInvites = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
-        const page = Number(req.query.page) || 1;
-        const limit = Number(req.query.limit) || 10;
+        const page = (req.query.page as string) || '1';
+        const limit = (req.query.limit as string) || '10';
 
-        if (page < 1 || limit < 1) {
-            res.status(400).json({
-                success: false,
-                message: 'page and limit must be positive integers'
-            });
-            return;
+        const validation = validatePagination(page, limit);
+        if (!validation.valid) {
+            return badRequestResponse(res, validation.error);
         }
 
-        const data = await inviteService.getAllInvites({ page, limit });
+        const data = await inviteService.getAllInvites({
+            page: Number(page),
+            limit: Number(limit)
+        });
 
-        res.status(200).json({
-            success: true,
-            data,
-            pagination: {
-                page,
-                limit
-            }
-        });
-    } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: err?.message || 'Failed to fetch invites'
-        });
+        const total = await prisma.testInvite.count({ where: { isActive: true } });
+        const pagination = calculatePagination(page, limit, total);
+
+        return paginatedResponse(res, data, pagination, 'Invites fetched successfully');
+    } catch (error: any) {
+        return serverErrorResponse(res, error.message || 'Failed to fetch invites');
     }
 };
 
@@ -169,7 +164,7 @@ export const getAllInvites = async (
 export const deleteInvite = async (
     req: Request,
     res: Response
-): Promise<void> => {
+): Promise<Response> => {
     try {
         const { id } = req.params;
         const user = (req as any).user;
@@ -177,28 +172,26 @@ export const deleteInvite = async (
         const instituteId: string = user?.instituteId;
 
         if (!id) {
-            res.status(400).json({ success: false, message: 'Invite ID is required' });
-            return;
+            return badRequestResponse(res, 'Invite ID is required');
         }
 
         if (!userId || !instituteId) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
+            return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const deleted = await inviteService.deleteInvite(id, userId, instituteId);
 
-        res.status(200).json({
-            success: true,
-            message: 'Invite deleted successfully',
-            data: deleted
-        });
-    } catch (err: any) {
-        const message = err?.message || 'Failed to delete invite';
-        const status =
-            message.includes('not found') ? 404 :
-                message.includes('access denied') ? 403 :
-                    message.includes('completed') ? 409 : 400;
-        res.status(status).json({ success: false, message });
+        return successResponse(res, deleted, 'Invite deleted successfully');
+    } catch (error: any) {
+        if (error.message.includes('not found')) {
+            return notFoundResponse(res, error.message);
+        }
+        if (error.message.includes('access denied')) {
+            return forbiddenResponse(res, error.message);
+        }
+        if (error.message.includes('completed')) {
+            return conflictResponse(res, error.message);
+        }
+        return badRequestResponse(res, error.message || 'Failed to delete invite');
     }
 };

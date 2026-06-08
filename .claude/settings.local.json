@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem _bmad-output\\\\project-context.md, docs\\\\context\\\\project-context.md, docs\\\\project-context.md | ForEach-Object { '{0} -- {1} bytes' -f $_.FullName.Substring\\($_.FullName.LastIndexOf\\('psychometric-platform-backend'\\)\\), $_.Length })"
+    ]
+  }
+}
