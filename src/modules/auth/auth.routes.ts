@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as authController from './auth.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
+import { authRateLimiter } from '../../middleware/rateLimit.middleware';
 
 const router = Router();
 
@@ -114,7 +115,7 @@ const router = Router();
  *                   type: string
  *                   example: Internal server error
  */
-router.post('/register', authController.register);
+router.post('/register', authRateLimiter, authController.register);
 
 /**
  * @swagger
@@ -216,7 +217,7 @@ router.post('/register', authController.register);
  *                   type: string
  *                   example: Internal server error
  */
-router.post('/login', authController.login);
+router.post('/login', authRateLimiter, authController.login);
 
 /**
  * @swagger

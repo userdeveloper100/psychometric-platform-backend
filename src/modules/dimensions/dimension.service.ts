@@ -1,6 +1,10 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
 import { cascadeSoftDelete } from '../../utils/softDelete';
+import { withCache, cacheDelete } from '../../utils/cache';
+
+// Test structures change rarely — good cache candidates (5 min TTL via withCache).
+const testDimensionsCacheKey = (testId: string) => `dimensions:test:${testId}`;
 
 interface CreateDimensionInput {
     name: string;
@@ -34,6 +38,9 @@ export async function createDimension(
             }
         });
 
+        // Invalidate the cached dimension list for this test.
+        await cacheDelete(testDimensionsCacheKey(testId));
+
         return dimension;
     } catch (error) {
         if (error instanceof Error) throw error;
@@ -55,10 +62,12 @@ export async function getTestDimensions(testId: string) {
             throw new Error('Test not found');
         }
 
-        return prisma.dimension.findMany({
-            where: { testId, isActive: true },
-            orderBy: { createdAt: 'asc' }
-        });
+        return withCache(testDimensionsCacheKey(testId), () =>
+            prisma.dimension.findMany({
+                where: { testId, isActive: true },
+                orderBy: { createdAt: 'asc' }
+            })
+        );
     } catch (error) {
         if (error instanceof Error) throw error;
         throw new Error('Failed to fetch dimensions');
@@ -95,6 +104,9 @@ export async function deleteDimension(dimensionId: string, userId: string) {
         }
 
         await cascadeSoftDelete('dimension', dimensionId, ['question'], userId);
+
+        // Invalidate the cached dimension list for the parent test.
+        await cacheDelete(testDimensionsCacheKey(dimension.testId));
 
         return { success: true };
     } catch (error) {
