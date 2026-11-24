@@ -1,3 +1,5 @@
+// Validates configuration before the app is built (see src/config/env.ts).
+import { env } from "./config/env";
 import express from "express";
 import cors, { CorsOptions } from "cors";
 import swaggerUi from "swagger-ui-express";
@@ -14,7 +16,7 @@ app.set("trust proxy", 1);
 // CORS: comma-separated allowlist via CORS_ORIGINS (e.g.
 // "http://localhost:5173,https://app.example.com"). Defaults to "*" (reflect
 // any origin) for local development.
-const allowedOrigins = (process.env.CORS_ORIGINS || "*")
+const allowedOrigins = env.CORS_ORIGINS
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);

@@ -7,6 +7,7 @@ const config: Config = {
     testMatch: ['**/*.spec.ts', '**/*.test.ts'],
     // Integration specs need a real database. They run only via jest.integration.config.ts.
     testPathIgnorePatterns: ['/node_modules/', '<rootDir>/src/integration/'],
+    setupFiles: ['<rootDir>/src/test-utils/unit.setup.ts'],
     clearMocks: true,
     collectCoverageFrom: [
         'src/**/*.ts',

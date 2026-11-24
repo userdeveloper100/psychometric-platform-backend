@@ -1,18 +1,13 @@
-import { config } from 'dotenv';
+import { env } from './env';
 
-config();
-
-const dbConfig = {
-  url: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/mydb',
-};
-
-const jwtConfig = {
-  secret: process.env.JWT_SECRET || 'your_jwt_secret',
-  expiresIn: process.env.JWT_EXPIRES_IN || '1h',
-};
-
+// Compatibility view over the validated environment. Prefer importing `env` directly.
 export default {
-  db: dbConfig,
-  jwt: jwtConfig,
-  PORT: process.env.PORT || 5000,
+  db: {
+    url: env.DATABASE_URL,
+  },
+  jwt: {
+    secret: env.JWT_SECRET,
+    expiresIn: env.JWT_EXPIRES_IN,
+  },
+  PORT: env.PORT,
 };

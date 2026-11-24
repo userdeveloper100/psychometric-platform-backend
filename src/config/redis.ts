@@ -8,10 +8,11 @@
  */
 
 import { createClient } from 'redis';
+import { env } from './env';
 
 type RedisClient = ReturnType<typeof createClient>;
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = env.REDIS_URL;
 
 let client: RedisClient | null = null;
 let ready = false;

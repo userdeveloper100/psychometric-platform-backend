@@ -1,8 +1,10 @@
+// Imported first: validates configuration (including JWT_SECRET) before anything else starts.
+import { env } from "./config/env";
 import app from "./app";
 import prisma from "./config/prisma";
 import { connectRedis, disconnectRedis } from "./config/redis";
 
-const PORT = process.env.PORT || 5001;
+const PORT = env.PORT;
 
 const startServer = async () => {
     try {

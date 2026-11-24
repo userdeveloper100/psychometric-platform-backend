@@ -103,7 +103,7 @@ Expected last lines: `Database schema is up to date!` followed by `[integration-
 | Goal | Command |
 |---|---|
 | Build (type check of production code) | `npm run build` |
-| Unit tests (106 tests, 13 suites, no database) | `npm test` |
+| Unit tests (129 tests, 16 suites, no database) | `npm test` |
 | Integration tests (pass today) | `npm run test:integration` |
 | Pending security regressions (expected to fail today) | `npm run test:integration:pending` |
 | Apply migrations to the test database | `npm run test:db:setup` |
@@ -158,19 +158,19 @@ Run on 2026-11-24 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 13 suites) | 13 of 13 suites, **106 of 106 tests passed** |
-| `npm run test:integration` | 2 of 2 suites, **23 of 23 tests passed** |
-| `npm run test:integration:pending` | **21 of 21 failed, as designed** (see section 8) |
+| `npm test` (unit, 16 suites) | 16 of 16 suites, **129 of 129 tests passed** |
+| `npm run test:integration` | 2 of 2 suites, **30 of 30 tests passed** |
+| `npm run test:integration:pending` | **20 of 20 failed, as designed** (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (23)
+### 7.1 Passing integration tests (30)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
-**`guards.integration.spec.ts` (14):** these are regression guards. They pass today and must keep passing. They are not evidence that an audit finding is fixed.
+**`guards.integration.spec.ts` (21):** these are regression guards. They pass today and must keep passing. They are not evidence that an audit finding is fixed.
 
 | Area | What is guarded |
 |---|---|
@@ -212,10 +212,9 @@ Run them with `npm run test:integration:pending`.
 | SEC-10 | Admin of A reads B test report | **400** (functional defect, see below) | **Inconclusive**: the leak cannot be shown until the defect is fixed |
 | SEC-10 | Admin of A reads B student report | **400** (functional defect) | **Inconclusive** |
 | SEC-10 | Same-tenant student report returns one student | **400** (functional defect) | Functional failure |
-| SEC-07 | Token from `utils/jwt` verified by `authenticateJWT` without `JWT_SECRET` in environment | **Rejected** (signing and verifying modules use different fallback secrets) | Vulnerability confirmed |
 | FUNCTIONAL-DEFECT | Admin gets own test report | **400** (see below) | Functional defect, not a security finding |
 
-Counting: 21 pending tests in total, of which 20 are security regressions and 1 is the functional defect.
+Counting: 20 pending tests in total, of which 19 are security regressions (SEC-01, 02, 03, 05, 06, 10) and 1 is the functional defect. SEC-07 was fixed and promoted out of this suite (see section 9).
 
 ### 8.1 Functional defect that blocks SEC-10 evidence
 
@@ -231,7 +230,7 @@ This is not a security finding and it was not fixed here, because production cod
 
 ## 9. Known Limitations
 
-- **Startup configuration (SEC-07) is only partly testable.** The harness sets `JWT_SECRET` for each test file, so the normal suite cannot see a missing secret. The pending test checks the mismatch in isolated modules. It does not test that the server refuses to start without the variable. That needs a separate process-level test, planned in SEC-07.
+- **Startup configuration (SEC-07) is tested outside the integration suite.** The integration harness always provides a valid `JWT_SECRET`, so startup refusal is covered by `src/config/env.process.spec.ts`, which runs in the unit suite and loads `env.ts` in a fresh Node process. Integration tests cover HTTP 401 for missing, malformed, expired, wrong-secret and tampered tokens (`guards.integration.spec.ts`).
 - **No Redis in tests.** `server.ts` is not imported, so `connectRedis` never runs. Global and auth rate limiting, and the dimension cache, are no-ops. Rate-limit behaviour is not covered by integration tests.
 - **Sequential only.** `--runInBand` is required. Parallel runs would share one database.
 - **Single shared test database.** Suites are isolated by truncation, not by separate schemas.

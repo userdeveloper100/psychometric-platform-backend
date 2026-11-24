@@ -4,9 +4,13 @@
  * finding is fixed. The vulnerable cases for the same endpoints are in
  * security.pending.integration.spec.ts.
  */
+import jwt from 'jsonwebtoken';
+import request from 'supertest';
+import { env } from '../config/env';
 import {
     DENIED_STATUSES,
     api,
+    app,
     bodyText,
     prisma,
     seedTwoTenants,
@@ -122,5 +126,54 @@ describe('reports: correct cases (guards SEC-10 area)', () => {
     test('a STUDENT cannot read a test report (route role check)', async () => {
         const res = await api.get(`/api/reports/reports/test/${fx.a.test.id}`, fx.a.studentToken);
         expect(res.status).toBe(403);
+    });
+});
+
+describe('JWT verification on protected endpoints (SEC-07)', () => {
+    const PROTECTED = '/api/students';
+    const claims = { userId: 'forged-user', role: 'ADMIN', instituteId: 'forged-institute' };
+
+    test('a valid token from the app configuration is accepted (control)', async () => {
+        const token = jwt.sign({ ...claims, userId: fx.a.admin.id, instituteId: fx.a.institute.id }, env.JWT_SECRET);
+        const res = await request(app).get(PROTECTED).set('Authorization', `Bearer ${token}`);
+        expect(res.status).toBe(200);
+    });
+
+    test('missing Authorization header returns 401', async () => {
+        const res = await request(app).get(PROTECTED);
+        expect(res.status).toBe(401);
+    });
+
+    test('malformed scheme returns 401', async () => {
+        const token = jwt.sign(claims, env.JWT_SECRET);
+        const res = await request(app).get(PROTECTED).set('Authorization', `Basic ${token}`);
+        expect(res.status).toBe(401);
+    });
+
+    test('Bearer with a non-JWT value returns 401', async () => {
+        const res = await request(app).get(PROTECTED).set('Authorization', 'Bearer not-a-jwt');
+        expect(res.status).toBe(401);
+    });
+
+    test('expired token returns 401', async () => {
+        const expired = jwt.sign({ ...claims, exp: Math.floor(Date.now() / 1000) - 60 }, env.JWT_SECRET);
+        const res = await request(app).get(PROTECTED).set('Authorization', `Bearer ${expired}`);
+        expect(res.status).toBe(401);
+    });
+
+    test('token signed with a different secret returns 401', async () => {
+        const wrong = jwt.sign(claims, 'y'.repeat(40));
+        const res = await request(app).get(PROTECTED).set('Authorization', `Bearer ${wrong}`);
+        expect(res.status).toBe(401);
+    });
+
+    test('tampered payload with the original signature returns 401', async () => {
+        const token = jwt.sign({ ...claims, userId: fx.a.admin.id, instituteId: fx.a.institute.id }, env.JWT_SECRET);
+        const [header, , signature] = token.split('.');
+        const tamperedPayload = Buffer.from(JSON.stringify({ ...claims, role: 'SUPER' })).toString('base64url');
+        const res = await request(app)
+            .get(PROTECTED)
+            .set('Authorization', `Bearer ${header}.${tamperedPayload}.${signature}`);
+        expect(res.status).toBe(401);
     });
 });

@@ -9,7 +9,6 @@
  * Run with: npm run test:integration:pending
  * Mapping to audit IDs: docs/IMPLEMENTATION_AUDIT.md section 8.
  */
-import { randomBytes } from 'crypto';
 import {
     DENIED_STATUSES,
     api,
@@ -191,30 +190,6 @@ describe('[PENDING FUNCTIONAL-DEFECT] report routes read the wrong route paramet
     });
 });
 
-describe('[PENDING SEC-07] JWT verification must use the configured secret', () => {
-    test('a token issued by utils/jwt is accepted by authenticateJWT when JWT_SECRET is only in the environment', () => {
-        // The integration environment sets JWT_SECRET for the whole process. This test
-        // removes it, loads the modules fresh, and checks that both sides agree on the
-        // secret without any fallback. Today the signing and verifying modules use
-        // different hard-coded fallbacks, so this test fails.
-        const saved = process.env.JWT_SECRET;
-        delete process.env.JWT_SECRET;
-        try {
-            let accepted = false;
-            jest.isolateModules(() => {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const { generateToken } = require('../utils/jwt');
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const { authenticateJWT } = require('../middleware/auth.middleware');
-                const token = generateToken({ userId: 'u1', role: 'ADMIN', instituteId: 'i1' });
-                const next = jest.fn();
-                const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
-                authenticateJWT({ headers: { authorization: `Bearer ${token}` } } as any, res as any, next);
-                accepted = next.mock.calls.length === 1;
-            });
-            expect(accepted).toBe(true);
-        } finally {
-            process.env.JWT_SECRET = saved ?? randomBytes(48).toString('hex');
-        }
-    });
-});
+// SEC-07 (JWT configuration) was promoted out of this file once fixed. Its regression
+// tests now live in src/middleware/auth.middleware.spec.ts and src/config/env.process.spec.ts,
+// and the HTTP-level 401 checks are in src/integration/guards.integration.spec.ts.

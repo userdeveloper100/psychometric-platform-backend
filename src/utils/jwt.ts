@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
 
 export interface AppJwtPayload {
     userId: string;
@@ -6,10 +7,10 @@ export interface AppJwtPayload {
     instituteId?: string | null;
 }
 
-const JWT_SECRET: jwt.Secret = process.env.JWT_SECRET || 'dev-secret';
+// Signing and verification both use the validated secret from src/config/env.ts.
+const JWT_SECRET: jwt.Secret = env.JWT_SECRET;
 
-const JWT_EXPIRES_IN: jwt.SignOptions['expiresIn'] =
-    (process.env.JWT_EXPIRES_IN || '1d') as jwt.SignOptions['expiresIn'];
+const JWT_EXPIRES_IN: jwt.SignOptions['expiresIn'] = env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'];
 
 export const generateToken = (payload: AppJwtPayload): string => {
     return jwt.sign(payload, JWT_SECRET, {
