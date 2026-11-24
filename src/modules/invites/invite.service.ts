@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
@@ -19,7 +19,27 @@ export interface InviteResult {
 interface GetAllInvitesOptions {
     page?: number;
     limit?: number;
+    instituteId: string;
 }
+
+/**
+ * SEC-05: invite listings never include the token. A token is returned once, in the response to
+ * the admin who creates the invite, so it can be shared with the student. Reads never return it again.
+ */
+const inviteListSelect = {
+    id: true,
+    testId: true,
+    studentId: true,
+    status: true,
+    expiresAt: true,
+    createdAt: true,
+} as const;
+
+/** Fail-closed guard: an empty tenant scope never falls through to an unscoped query. */
+const requireInstitute = (instituteId: string | undefined): string => {
+    if (!instituteId) throw new Error('Institute scope is required');
+    return instituteId;
+};
 
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
@@ -91,7 +111,7 @@ export async function inviteStudents(
         const inviteData = newStudentIds.map((studentId) => ({
             testId,
             studentId,
-            token: randomUUID(),           // unique invite token
+            token: randomBytes(32).toString('hex'), // 256-bit CSPRNG token
             status: 'PENDING' as const,
             isActive: true,
             createdBy: userId
@@ -159,8 +179,8 @@ export async function getTestInvites(
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
-                token: true,
                 status: true,
+                expiresAt: true,
                 createdAt: true,
                 student: {
                     select: {
@@ -207,8 +227,8 @@ export async function getStudentInvites(
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
-                token: true,
                 status: true,
+                expiresAt: true,
                 createdAt: true,
                 test: {
                     select: {
@@ -232,19 +252,31 @@ export async function getStudentInvites(
     }
 }
 
+/** Invites of the requester's institute only. Scope is the invite's test, so a foreign invite is never listed. */
 export async function getAllInvites({
     page = 1,
-    limit = 10
-}: GetAllInvitesOptions = {}) {
+    limit = 10,
+    instituteId
+}: GetAllInvitesOptions) {
+    const scope = requireInstitute(instituteId);
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     return prisma.testInvite.findMany({
-        where: { isActive: true },
+        where: { isActive: true, test: { instituteId: scope } },
+        select: inviteListSelect,
         skip,
         take: currentLimit,
         orderBy: { createdAt: 'desc' }
+    });
+}
+
+/** Total for pagination, scoped the same way as getAllInvites. */
+export async function countInvites(instituteId: string) {
+    const scope = requireInstitute(instituteId);
+    return prisma.testInvite.count({
+        where: { isActive: true, test: { instituteId: scope } }
     });
 }
 

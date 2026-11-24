@@ -1,27 +1,42 @@
 import prisma from '../../config/prisma';
-import { countResponses, deleteResponse, getAllResponses, getStudentResponses, getTestResponses } from './response.service';
+import logger from '../../config/logger';
+import {
+    countResponses,
+    deleteResponse,
+    getAllResponses,
+    getStudentResponses,
+    getTestResponses,
+    submitResponses,
+} from './response.service';
 
-jest.mock('../../config/prisma', () => ({
-    __esModule: true,
-    default: {
+jest.mock('../../config/prisma', () => {
+    const client: any = {
         response: {
             findMany: jest.fn(),
             findFirst: jest.fn(),
             update: jest.fn(),
             count: jest.fn(),
+            createMany: jest.fn(),
         },
         student: { findFirst: jest.fn() },
         psychometricTest: { findFirst: jest.fn() },
-    },
-}));
+        testInvite: { findFirst: jest.fn(), update: jest.fn() },
+        question: { findMany: jest.fn() },
+    };
+    // The submit path runs inside a transaction. The mock passes the same client as the transaction.
+    client.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) => fn(client));
+    return { __esModule: true, default: client };
+});
 jest.mock('../../config/logger', () => ({
     __esModule: true,
     default: { error: jest.fn() },
 }));
 
-const responseMock = prisma.response as unknown as Record<'findMany' | 'findFirst' | 'update' | 'count', jest.Mock>;
+const responseMock = prisma.response as unknown as Record<'findMany' | 'findFirst' | 'update' | 'count' | 'createMany', jest.Mock>;
 const studentMock = prisma.student as unknown as { findFirst: jest.Mock };
 const testMock = prisma.psychometricTest as unknown as { findFirst: jest.Mock };
+const inviteMock = prisma.testInvite as unknown as { findFirst: jest.Mock; update: jest.Mock };
+const questionMock = prisma.question as unknown as { findMany: jest.Mock };
 
 const OWN = 'institute-a';
 const OTHER = 'institute-b';
@@ -157,5 +172,61 @@ describe('response.service tenant scope (SEC-03)', () => {
                 where: { id: 'response-a', ...expectedScope(OTHER) },
             });
         });
+    });
+});
+
+// SEC-05: invite validation on submission. Rejections are refused with a fixed message and never echo the token.
+describe('submitResponses invite validation (SEC-05)', () => {
+    const TOKEN = 'a'.repeat(64);
+    const payload = {
+        token: TOKEN,
+        studentId: 'student-a',
+        responses: [{ questionId: 'question-a', answer: 3 }],
+    };
+    const pendingInvite = (overrides: Record<string, unknown> = {}) => ({
+        id: 'invite-a',
+        studentId: 'student-a',
+        status: 'PENDING',
+        expiresAt: null,
+        ...overrides,
+    });
+
+    const expectRefusedWithoutToken = async (message: string) => {
+        await expect(submitResponses(payload, 'system')).rejects.toThrow(message);
+        expect(responseMock.createMany).not.toHaveBeenCalled();
+        expect(inviteMock.update).not.toHaveBeenCalled();
+        const logged = JSON.stringify((logger.error as jest.Mock).mock.calls);
+        expect(logged).not.toContain(TOKEN);
+    };
+
+    test('an unknown or revoked invite (isActive false) is refused with the generic message', async () => {
+        // The lookup filters on isActive: true, so a revoked invite is simply not found.
+        inviteMock.findFirst.mockResolvedValue(null);
+        await expectRefusedWithoutToken('Invalid or inactive invite token');
+        expect(inviteMock.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { token: TOKEN, isActive: true } })
+        );
+    });
+
+    test('an expired invite is refused and nothing is saved', async () => {
+        inviteMock.findFirst.mockResolvedValue(pendingInvite({ expiresAt: new Date(Date.now() - 60_000) }));
+        await expectRefusedWithoutToken('Invite has expired');
+    });
+
+    test('an already used invite (COMPLETED) is refused and nothing is saved', async () => {
+        inviteMock.findFirst.mockResolvedValue(pendingInvite({ status: 'COMPLETED' }));
+        await expectRefusedWithoutToken('Responses already submitted for this invite');
+    });
+
+    test('an invite with a future expiry is accepted and saved', async () => {
+        inviteMock.findFirst.mockResolvedValue(pendingInvite({ expiresAt: new Date(Date.now() + 60_000) }));
+        questionMock.findMany.mockResolvedValue([{ id: 'question-a', scaleMin: 1, scaleMax: 5 }]);
+        responseMock.createMany.mockResolvedValue({ count: 1 });
+        inviteMock.update.mockResolvedValue({});
+
+        const result = await submitResponses(payload, 'system');
+
+        expect(result).toEqual(expect.objectContaining({ success: true, createdCount: 1 }));
+        expect(responseMock.createMany).toHaveBeenCalled();
     });
 });

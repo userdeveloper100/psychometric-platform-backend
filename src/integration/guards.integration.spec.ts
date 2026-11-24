@@ -89,10 +89,11 @@ describe('response reads: correct cases (guards SEC-03 area)', () => {
 });
 
 describe('invite listing: correct cases (guards SEC-05 area)', () => {
-    test('admin sees the tokens of invites in their own test', async () => {
+    test('admin sees the invites of their own test, and no token is returned (SEC-05)', async () => {
         const res = await api.get(`/api/invites/tests/${fx.a.test.id}/invites`, fx.a.adminToken);
         expect(res.status).toBe(200);
-        expect(bodyText(res)).toContain(fx.a.invite.token);
+        expect(bodyText(res)).toContain(fx.a.invite.id);
+        expect(bodyText(res)).not.toContain(fx.a.invite.token);
     });
 
     test('admin asking for another institute test invites is denied, and no B token is returned', async () => {

@@ -202,6 +202,7 @@ router.get(
 router.get(
     '/students/:studentId/invites',
     authenticateJWT,
+    authorizeRoles('ADMIN'),
     inviteController.getStudentInvites
 );
 

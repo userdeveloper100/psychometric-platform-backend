@@ -58,9 +58,12 @@ export const submitResponses = async (data: SubmitResponsesInput, userId: string
             // 2) Invite must exist
             if (!invite) throw new Error('Invalid or inactive invite token');
 
-            // 3) Invite should be pending
+            // 3) Invite should be pending and not expired (SEC-05). Messages never include the token.
             if (invite.status === InviteStatus.COMPLETED) {
                 throw new Error('Responses already submitted for this invite');
+            }
+            if (invite.expiresAt && invite.expiresAt.getTime() <= now.getTime()) {
+                throw new Error('Invite has expired');
             }
 
             // 4) Student must match invite

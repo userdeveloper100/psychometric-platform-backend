@@ -49,17 +49,8 @@ describe('[PENDING DB-01, surfaced while fixing SEC-02] admin deletes their own 
 // SEC-03 (response tenant isolation) was promoted out of this file once fixed. Its active regression tests
 // live in src/integration/response-security.integration.spec.ts.
 
-describe('[PENDING SEC-05] invite tokens must not be exposed across tenants', () => {
-    test('admin of A listing all invites does not receive the invite token of institute B', async () => {
-        const res = await api.get('/api/invites', fx.a.adminToken);
-        expect(bodyText(res)).not.toContain(fx.b.invite.token);
-    });
-
-    test('a STUDENT cannot read invite tokens of a student record', async () => {
-        const res = await api.get(`/api/invites/students/${fx.a.student.id}/invites`, fx.a.studentToken);
-        expect(bodyText(res)).not.toContain(fx.a.invite.token);
-    });
-});
+// SEC-05 (invite token protection and invite role/tenant authorization) was promoted out of this file once fixed.
+// Its active regression tests live in src/integration/invite-security.integration.spec.ts.
 
 describe('[PENDING SEC-06] dimension and question writes must enforce tenant authorization', () => {
     test('admin of A cannot add a dimension to institute B test', async () => {

@@ -56,7 +56,8 @@ export const submitResponses = async (req: Request, res: Response): Promise<Resp
     } catch (error: any) {
         if (error.message === 'Invalid or inactive invite token' || 
             error.message === 'Responses already submitted for this invite' ||
-            error.message === 'Student does not match invite') {
+            error.message === 'Student does not match invite' ||
+            error.message === 'Invite has expired') {
             return badRequestResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to submit responses');

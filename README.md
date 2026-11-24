@@ -847,12 +847,12 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | `SEC-02` Role & Tenant Authorization on Institute Endpoints | Reusable `authorizeRoles` middleware (401 with no user, 403 for the wrong role). All five institute routes require ADMIN. An ADMIN can view, update or delete only their own institute; a foreign institute returns 404 before any cascade runs. Listing is scoped to the requester's institute. Spoofed `instituteId` values in query or body are ignored | `security: protect institute endpoints with role authorization` |
 | `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
 | `SEC-03` Response Tenant Isolation & Role Authorization | Response list, student read, test read and delete require ADMIN (STUDENT gets 403). Every read and delete is scoped through student and test to the requester's institute; a foreign student, test or response returns 404 with no data; a missing institute fails closed. Student submission is unchanged | `security: enforce response tenant isolation` |
+| `SEC-05` Invite Token Protection & Access | Invite listings and reads never return a token; a token is returned once, to the admin who creates the invite. All invite routes require ADMIN (STUDENT gets 403) and are scoped to the requester's institute (foreign invite or student returns 404). Tokens use `randomBytes(32)`. Submission refuses expired invites. Unknown, revoked, expired and used tokens are refused without echoing the token. **Not done:** tokens are still stored in plaintext; hashing at rest needs a migration and a decision on existing invites | `security: protect invite tokens and access` |
 
 ## Pending (`PENDING`)
 
 | Task | Scope |
 |---|---|
-| `SEC-05` | Protect invite tokens: remove from list responses, hash tokens, expiry and revocation |
 | `SEC-06` | Validate parent ownership for dimension and question writes and deletes |
 | `SEC-10` | Enforce tenant-scoped reporting and fix the `report.controller.ts` `:testId` parameter bug |
 | `DB-01` | Fix soft-delete cascade lookup relationships. Also blocks an ADMIN deleting their own institute, which currently returns 500 (a pending test covers it) |
@@ -869,9 +869,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 20 of 20 suites, **187 of 187 tests passed** |
-| Integration (active) | `npm run test:integration` | 5 of 5 suites, **80 of 80 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **11 of 11 failing, as designed**: 9 security tests (`SEC-05` ×2, `SEC-06` ×4, `SEC-10` ×3), 1 `DB-01` cascade defect (own-institute delete returns 500), and 1 functional defect in the report route parameter |
+| Unit | `npm test` | 21 of 21 suites, **211 of 211 tests passed** |
+| Integration (active) | `npm run test:integration` | 6 of 6 suites, **104 of 104 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **9 of 9 failing, as designed**: 7 security tests (`SEC-06` ×4, `SEC-10` ×3), 1 `DB-01` cascade defect (own-institute delete returns 500), and 1 functional defect in the report route parameter |
 
 ---
 

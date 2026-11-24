@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import * as inviteService from './invite.service';
-import prisma from '../../config/prisma';
 import {
     successResponse,
     createdResponse,
@@ -145,16 +144,23 @@ export const getAllInvites = async (
             return badRequestResponse(res, validation.error);
         }
 
+        // SEC-05: the tenant comes only from the verified JWT. Query values are never read as the scope.
+        const instituteId: string = (req as any).user?.instituteId || '';
+
         const data = await inviteService.getAllInvites({
             page: Number(page),
-            limit: Number(limit)
+            limit: Number(limit),
+            instituteId
         });
 
-        const total = await prisma.testInvite.count({ where: { isActive: true } });
+        const total = await inviteService.countInvites(instituteId);
         const pagination = calculatePagination(page, limit, total);
 
         return paginatedResponse(res, data, pagination, 'Invites fetched successfully');
     } catch (error: any) {
+        if (error.message === 'Institute scope is required') {
+            return forbiddenResponse(res, 'Forbidden: Institute scope is required');
+        }
         return serverErrorResponse(res, error.message || 'Failed to fetch invites');
     }
 };
