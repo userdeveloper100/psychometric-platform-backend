@@ -844,18 +844,18 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | Backend Implementation Audit & Roadmap | Five audit documents in `docs/` | `94cc856` |
 | `SEC-11` Integration Test Infrastructure | Isolated `psychometric_test` database guard, fixtures, supertest harness | `9fa8803`, `docs/INTEGRATION_TESTING.md` |
 | `SEC-07` Centralized Environment & JWT Secret Validation | `src/config/env.ts` validates configuration at startup; JWT secret must be at least 32 characters; hard-coded fallback secrets removed | `6c9e926` |
+| `SEC-02` Role & Tenant Authorization on Institute Endpoints | Reusable `authorizeRoles` middleware (401 with no user, 403 for the wrong role). All five institute routes require ADMIN. An ADMIN can view, update or delete only their own institute; a foreign institute returns 404 before any cascade runs. Listing is scoped to the requester's institute. Spoofed `instituteId` values in query or body are ignored | `security: protect institute endpoints with role authorization` |
 | `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
 
 ## Pending (`PENDING`)
 
 | Task | Scope |
 |---|---|
-| `SEC-02` | Enforce role and tenant authorization on institute endpoints |
 | `SEC-03` | Enforce tenant isolation on assessment responses |
 | `SEC-05` | Protect invite tokens: remove from list responses, hash tokens, expiry and revocation |
 | `SEC-06` | Validate parent ownership for dimension and question writes and deletes |
 | `SEC-10` | Enforce tenant-scoped reporting and fix the `report.controller.ts` `:testId` parameter bug |
-| `DB-01` | Fix soft-delete cascade lookup relationships |
+| `DB-01` | Fix soft-delete cascade lookup relationships. Also blocks an ADMIN deleting their own institute, which currently returns 500 (a pending test covers it) |
 | `DB-02` | Allow valid student re-invitations after soft delete |
 | `DB-03` | Enforce assessment response question and student integrity |
 | `DEC-01` | Platform model decision (institute and student platform, or recruiting SaaS) |
@@ -869,9 +869,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 17 of 17 suites, **146 of 146 tests passed** |
-| Integration (active) | `npm run test:integration` | 3 of 3 suites, **44 of 44 tests passed** |
-| Pending security regressions | `npm run test:integration:pending` | **18 of 18 failing, as designed**: 17 security tests (`SEC-02`, `SEC-03`, `SEC-05`, `SEC-06`, `SEC-10`) plus 1 functional defect in the report route parameter |
+| Unit | `npm test` | 19 of 19 suites, **166 of 166 tests passed** |
+| Integration (active) | `npm run test:integration` | 4 of 4 suites, **60 of 60 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **15 of 15 failing, as designed**: 13 security tests (`SEC-03`, `SEC-05`, `SEC-06`, `SEC-10`), 1 `DB-01` cascade defect (own-institute delete returns 500), and 1 functional defect in the report route parameter |
 
 ---
 

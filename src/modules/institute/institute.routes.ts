@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import * as instituteController from './institute.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
+import { authorizeRoles } from '../../middleware/role.middleware';
+
+// SEC-02: every institute route requires a valid token and the ADMIN role. Tenant scope is
+// enforced in the controller and service (an ADMIN can only act on their own institute).
 
 const router = Router();
 
@@ -45,7 +49,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/', authenticateJWT, instituteController.createInstitute);
+router.post('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.createInstitute);
 
 // Read
 /**
@@ -95,7 +99,7 @@ router.post('/', authenticateJWT, instituteController.createInstitute);
  *       500:
  *         description: Internal server error
  */
-router.get('/', authenticateJWT, instituteController.getAllInstitutes);
+router.get('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.getAllInstitutes);
 /**
  * @swagger
  * /api/v1/{id}:
@@ -134,7 +138,7 @@ router.get('/', authenticateJWT, instituteController.getAllInstitutes);
  *       500:
  *         description: Internal server error
  */
-router.get('/:id', authenticateJWT, instituteController.getInstituteById);
+router.get('/:id', authenticateJWT, authorizeRoles('ADMIN'), instituteController.getInstituteById);
 
 // Update
 /**
@@ -185,7 +189,7 @@ router.get('/:id', authenticateJWT, instituteController.getInstituteById);
  *       500:
  *         description: Internal server error
  */
-router.put('/:id', authenticateJWT, instituteController.updateInstitute);
+router.put('/:id', authenticateJWT, authorizeRoles('ADMIN'), instituteController.updateInstitute);
 
 // Soft delete
 /**
@@ -226,6 +230,6 @@ router.put('/:id', authenticateJWT, instituteController.updateInstitute);
  *       500:
  *         description: Internal server error
  */
-router.delete('/:id', authenticateJWT, instituteController.deleteInstitute);
+router.delete('/:id', authenticateJWT, authorizeRoles('ADMIN'), instituteController.deleteInstitute);
 
 export default router;

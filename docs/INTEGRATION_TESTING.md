@@ -103,7 +103,7 @@ Expected last lines: `Database schema is up to date!` followed by `[integration-
 | Goal | Command |
 |---|---|
 | Build (type check of production code) | `npm run build` |
-| Unit tests (146 tests, 17 suites, no database) | `npm test` |
+| Unit tests (166 tests, 19 suites, no database) | `npm test` |
 | Integration tests (pass today) | `npm run test:integration` |
 | Pending security regressions (expected to fail today) | `npm run test:integration:pending` |
 | Apply migrations to the test database | `npm run test:db:setup` |
@@ -158,19 +158,21 @@ Run on 2026-11-24 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 17 suites) | 17 of 17 suites, **146 of 146 tests passed** |
-| `npm run test:integration` | 3 of 3 suites, **44 of 44 tests passed** |
-| `npm run test:integration:pending` | **18 of 18 failed, as designed** (see section 8) |
+| `npm test` (unit, 19 suites) | 19 of 19 suites, **166 of 166 tests passed** |
+| `npm run test:integration` | 4 of 4 suites, **60 of 60 tests passed** |
+| `npm run test:integration:pending` | **15 of 15 failed, as designed** (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (44)
+### 7.1 Passing integration tests (60)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
 **`test-security.integration.spec.ts` (14):** SEC-01 regression tests, promoted from the pending suite once fixed. Publish and delete are scoped to the caller's institute. A spoofed `instituteId` in the body is ignored. A foreign and a non-existent test return the same 404. STUDENT gets 403 and no token gets 401.
+
+**`institute-security.integration.spec.ts` (16):** SEC-02 regression tests, promoted from the pending suite once fixed. Every institute route requires the ADMIN role (STUDENT gets 403). An ADMIN can act only on their own institute: a foreign institute returns 404 with no data returned and no cascade run. A foreign and a non-existent institute get the same response. A spoofed `instituteId` in the body or query does not widen scope. Unauthenticated requests get 401. Own-institute DELETE is not asserted here (see the DB-01 pending entry in section 8).
 
 **`guards.integration.spec.ts` (21):** these are regression guards. They pass today and must keep passing. They are not evidence that an audit finding is fixed.
 
@@ -179,7 +181,7 @@ Run on 2026-11-24 against `psychometric_test`:
 | Harness | App-issued JWT accepted on a protected route; no token gives 401 |
 | Students (SEC-09 area) | Admin of A sees A students only |
 | Test publish (SEC-01 area) | Own test publishes (200); STUDENT cannot publish (403). Cross-institute cases are in test-security.integration.spec.ts |
-| Institutes (SEC-02 area) | No token gives 401; admin reads own institute (200) |
+| Institutes (SEC-02 area) | No token gives 401; admin reads own institute (200); STUDENT cannot list institutes (403) |
 | Responses (SEC-03 area) | No token gives 401 on a test-response read |
 | Invites (SEC-05 area) | Admin sees own test invite tokens; another institute's invites are denied and do not expose the token |
 | Dimensions (SEC-06 area) | Admin adds a dimension to own test (201); STUDENT cannot add one (403) |
@@ -195,10 +197,6 @@ Run them with `npm run test:integration:pending`.
 
 | Audit ID | Scenario | Observed today | Status |
 |---|---|---|---|
-| SEC-02 | STUDENT creates an institute | **201** | Vulnerability confirmed |
-| SEC-02 | STUDENT reads another institute | **200** | Vulnerability confirmed |
-| SEC-02 | Admin of A renames institute B | **200** | Vulnerability confirmed |
-| SEC-02 | Admin of A soft deletes institute B | **500**: Prisma error inside the cascade (`softDelete.ts:72`) | Denial missing. Failure is also the cascade defect (DB-01). |
 | SEC-03 | STUDENT lists all responses | **200** | Vulnerability confirmed |
 | SEC-03 | Admin of A deletes a response of B | **200** | Vulnerability confirmed |
 | SEC-03 | Admin of A reads the responses of B test | **200**, with B data | Vulnerability confirmed |
@@ -214,7 +212,7 @@ Run them with `npm run test:integration:pending`.
 | SEC-10 | Same-tenant student report returns one student | **400** (functional defect) | Functional failure |
 | FUNCTIONAL-DEFECT | Admin gets own test report | **400** (see below) | Functional defect, not a security finding |
 
-Counting: 18 pending tests in total, of which 17 are security regressions (SEC-02, 03, 05, 06, 10) and 1 is the functional defect. SEC-01 and SEC-07 were fixed and promoted to active suites (`test-security.integration.spec.ts`, `guards.integration.spec.ts`, `src/config/env.process.spec.ts`).
+Counting: 15 pending tests in total: 13 security regressions (SEC-03, 05, 06, 10), 1 DB-01 cascade defect that blocks the own-institute delete, and 1 functional report-parameter defect. SEC-01, SEC-02 and SEC-07 were fixed and promoted to active suites (`test-security.integration.spec.ts`, `guards.integration.spec.ts`, `src/config/env.process.spec.ts`).
 
 ### 8.1 Functional defect that blocks SEC-10 evidence
 

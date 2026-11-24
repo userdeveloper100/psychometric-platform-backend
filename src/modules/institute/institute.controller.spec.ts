@@ -114,4 +114,78 @@ describe('institute.controller', () => {
             expect(statusCode(res)).toBe(404);
         });
     });
+
+    // SEC-02: the tenant scope comes only from req.user. Query and body instituteId values are ignored.
+    describe('SEC-02 tenant scope from req.user', () => {
+        const adminA = { userId: 'u1', role: 'ADMIN', instituteId: 'institute-a' };
+        const spoof = 'institute-b';
+
+        test('getInstituteById passes the requester institute, ignoring a spoofed query instituteId', async () => {
+            svc.getInstituteById.mockResolvedValue({ id: 'institute-a' } as any);
+            const req = mockRequest({ params: { id: 'institute-a' }, query: { instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await instituteController.getInstituteById(req, res);
+
+            expect(svc.getInstituteById).toHaveBeenCalledWith('institute-a', 'institute-a');
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('getInstituteById maps another institute to 404', async () => {
+            svc.getInstituteById.mockRejectedValue(new Error('Institute not found'));
+            const req = mockRequest({ params: { id: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await instituteController.getInstituteById(req, res);
+
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('updateInstitute forwards only the name from the body and the requester institute', async () => {
+            svc.updateInstitute.mockResolvedValue({ id: 'institute-a' } as any);
+            const req = mockRequest({
+                params: { id: 'institute-a' },
+                body: { name: 'New', instituteId: spoof },
+                user: adminA,
+            });
+            const res = mockResponse();
+
+            await instituteController.updateInstitute(req, res);
+
+            expect(svc.updateInstitute).toHaveBeenCalledWith('institute-a', { name: 'New' }, 'u1', 'institute-a');
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('updateInstitute maps another institute to 404', async () => {
+            svc.updateInstitute.mockRejectedValue(new Error('Institute not found'));
+            const req = mockRequest({ params: { id: spoof }, body: { name: 'Hijack' }, user: adminA });
+            const res = mockResponse();
+
+            await instituteController.updateInstitute(req, res);
+
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('deleteInstitute passes the requester institute and maps another institute to 404', async () => {
+            svc.deleteInstitute.mockRejectedValue(new Error('Institute not found'));
+            const req = mockRequest({ params: { id: spoof }, body: { instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await instituteController.deleteInstitute(req, res);
+
+            expect(svc.deleteInstitute).toHaveBeenCalledWith(spoof, 'u1', 'institute-a');
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('getAllInstitutes lists only the requester institute, ignoring a spoofed query instituteId', async () => {
+            svc.getAllInstitutes.mockResolvedValue([{ id: 'institute-a' }] as any);
+            const req = mockRequest({ query: { page: '1', limit: '10', instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await instituteController.getAllInstitutes(req, res);
+
+            expect(svc.getAllInstitutes).toHaveBeenCalledWith({ page: 1, limit: 10, instituteId: 'institute-a' });
+            expect(statusCode(res)).toBe(200);
+        });
+    });
 });

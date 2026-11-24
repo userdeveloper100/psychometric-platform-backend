@@ -31,33 +31,18 @@ afterAll(async () => {
 // SEC-01 (test publish and delete tenant ownership) was promoted out of this file once fixed.
 // Its active regression tests live in src/integration/test-security.integration.spec.ts.
 
-describe('[PENDING SEC-02] institute endpoints must enforce roles and tenant boundaries', () => {
-    test('a STUDENT cannot create an institute', async () => {
-        const res = await api
-            .post('/api/institutes', fx.a.studentToken)
-            .send({ name: 'Rogue institute', email: 'rogue@integration.test' });
-        expect(DENIED_STATUSES).toContain(res.status);
-    });
+// SEC-02 (institute role and tenant authorization) was promoted out of this file once fixed.
+// Its active regression tests live in src/integration/institute-security.integration.spec.ts.
 
-    test('a STUDENT cannot read another institute', async () => {
-        const res = await api.get(`/api/institutes/${fx.b.institute.id}`, fx.a.studentToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-    });
-
-    test('admin of A cannot rename institute B', async () => {
-        const res = await api
-            .put(`/api/institutes/${fx.b.institute.id}`, fx.a.adminToken)
-            .send({ name: 'Renamed by A' });
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.institute.findUnique({ where: { id: fx.b.institute.id } });
-        expect(row?.name).toBe(fx.b.institute.name);
-    });
-
-    test('admin of A cannot soft delete institute B or its users', async () => {
-        const res = await api.delete(`/api/institutes/${fx.b.institute.id}`, fx.a.adminToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.institute.findUnique({ where: { id: fx.b.institute.id } });
-        expect(row?.isActive).toBe(true);
+describe('[PENDING DB-01, surfaced while fixing SEC-02] admin deletes their own institute', () => {
+    // Not a SEC-02 failure. An ADMIN may delete their own institute, but the soft-delete cascade
+    // currently fails with a Prisma invocation error (see softDelete.ts modelFieldMap, DB-01).
+    // This test stays pending until DB-01 is fixed.
+    test('admin of A can soft delete their own institute (200)', async () => {
+        const res = await api.delete(`/api/institutes/${fx.a.institute.id}`, fx.a.adminToken);
+        expect(res.status).toBe(200);
+        const row = await prisma.institute.findUnique({ where: { id: fx.a.institute.id } });
+        expect(row?.isActive).toBe(false);
     });
 });
 

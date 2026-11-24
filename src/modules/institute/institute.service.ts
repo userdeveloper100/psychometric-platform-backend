@@ -16,6 +16,19 @@ interface GetInstitutesOptions {
 interface GetAllInstitutesOptions {
     page?: number;
     limit?: number;
+    // Trusted tenant scope: the requester's own institute (from req.user), never from the request payload.
+    instituteId: string;
+}
+
+/**
+ * SEC-02: an ADMIN may only act on their own institute. Any other id is reported as "not found",
+ * the same as a missing institute, so cross-tenant ids are not revealed. Runs before any read
+ * that feeds a write, and before any cascade.
+ */
+export function assertOwnInstitute(id: string, requestingInstituteId: string): void {
+    if (!requestingInstituteId || id !== requestingInstituteId) {
+        throw new Error('Institute not found');
+    }
 }
 
 // ─── Create Institute ─────────────────────────────────────────────────────────
@@ -114,14 +127,20 @@ export async function getInstitutes({
 
 export async function getAllInstitutes({
     page = 1,
-    limit = 10
-}: GetAllInstitutesOptions = {}) {
+    limit = 10,
+    instituteId
+}: GetAllInstitutesOptions) {
+    // Fail closed: without a trusted tenant scope, return nothing. Prisma ignores an undefined filter.
+    if (!instituteId) {
+        return [];
+    }
+
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     return prisma.institute.findMany({
-        where: { isActive: true },
+        where: { isActive: true, id: instituteId },
         skip,
         take: currentLimit,
         orderBy: { createdAt: 'desc' }
@@ -130,7 +149,8 @@ export async function getAllInstitutes({
 
 // ─── Get Institute By ID ──────────────────────────────────────────────────────
 
-export async function getInstituteById(id: string) {
+export async function getInstituteById(id: string, requestingInstituteId: string) {
+    assertOwnInstitute(id, requestingInstituteId);
     try {
         const institute = await prisma.institute.findFirst({
             where: {
@@ -158,7 +178,14 @@ export async function getInstituteById(id: string) {
     }
 }
 
-export async function updateInstitute(id: string, data: { name?: string }, userId: string) {
+export async function updateInstitute(
+    id: string,
+    data: { name?: string },
+    userId: string,
+    requestingInstituteId: string
+) {
+    assertOwnInstitute(id, requestingInstituteId);
+
     const institute = await prisma.institute.findFirst({
         where: { id, isActive: true }
     });
@@ -177,7 +204,10 @@ export async function updateInstitute(id: string, data: { name?: string }, userI
     });
 }
 
-export async function deleteInstitute(id: string, userId: string) {
+export async function deleteInstitute(id: string, userId: string, requestingInstituteId: string) {
+    // Checked before any read or cascade, so a cross-tenant delete never reaches the cascade.
+    assertOwnInstitute(id, requestingInstituteId);
+
     const institute = await prisma.institute.findFirst({
         where: { id, isActive: true }
     });

@@ -93,10 +93,15 @@ export const getAllInstitutes = async (
             return badRequestResponse(res, validation.error);
         }
 
+        const instituteId = getRequesterInstituteId(req);
         const skip = calculateSkip(page, limit);
-        const data = await instituteService.getAllInstitutes({ page: Number(page), limit: Number(limit) });
+        const data = await instituteService.getAllInstitutes({
+            page: Number(page),
+            limit: Number(limit),
+            instituteId
+        });
 
-        const total = await prisma.institute.count({ where: { isActive: true } });
+        const total = await prisma.institute.count({ where: { isActive: true, id: instituteId || '' } });
         const pagination = calculatePagination(page, limit, total);
 
         return paginatedResponse(res, data, pagination, 'Institutes fetched successfully');
@@ -118,7 +123,7 @@ export const getInstituteById = async (
             return badRequestResponse(res, 'Institute ID is required');
         }
 
-        const institute = await instituteService.getInstituteById(id);
+        const institute = await instituteService.getInstituteById(id, getRequesterInstituteId(req));
 
         return successResponse(res, institute, 'Institute fetched successfully');
     } catch (error: any) {
@@ -134,12 +139,25 @@ const getUserId = (req: Request): string => {
     return user?.id || user?.userId || 'system';
 };
 
+// SEC-02: the tenant scope always comes from the authenticated user. Query, params and body
+// instituteId values are never used. Missing scope yields '' and the service fails closed.
+const getRequesterInstituteId = (req: Request): string => {
+    const user = (req as any).user;
+    return user?.instituteId || '';
+};
+
 export const updateInstitute = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
         const userId = getUserId(req);
 
-        const institute = await instituteService.updateInstitute(id, req.body, userId);
+        // Only the name is taken from the body. Any other body field, including instituteId, is ignored.
+        const institute = await instituteService.updateInstitute(
+            id,
+            { name: req.body?.name },
+            userId,
+            getRequesterInstituteId(req)
+        );
 
         return successResponse(res, institute, 'Institute updated successfully');
     } catch (error: any) {
@@ -155,7 +173,7 @@ export const deleteInstitute = async (req: Request, res: Response): Promise<Resp
         const { id } = req.params;
         const userId = getUserId(req);
 
-        const result = await instituteService.deleteInstitute(id, userId);
+        const result = await instituteService.deleteInstitute(id, userId, getRequesterInstituteId(req));
 
         return successResponse(res, result, 'Institute deleted successfully');
     } catch (error: any) {
