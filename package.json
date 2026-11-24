@@ -4,8 +4,11 @@
   "description": "A SaaS Psychometric Testing Platform backend built with Node.js, Express, TypeScript, and Prisma.",
   "main": "src/server.ts",
   "scripts": {
+    "predev": "node scripts/ensure-env.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "postinstall": "node scripts/ensure-env.js && prisma generate",
     "build": "tsc",
+    "prestart": "node scripts/ensure-env.js",
     "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
