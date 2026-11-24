@@ -52,39 +52,8 @@ describe('[PENDING DB-01, surfaced while fixing SEC-02] admin deletes their own 
 // SEC-05 (invite token protection and invite role/tenant authorization) was promoted out of this file once fixed.
 // Its active regression tests live in src/integration/invite-security.integration.spec.ts.
 
-describe('[PENDING SEC-06] dimension and question writes must enforce tenant authorization', () => {
-    test('admin of A cannot add a dimension to institute B test', async () => {
-        const before = await prisma.dimension.count({ where: { testId: fx.b.test.id } });
-        const res = await api
-            .post(`/api/dimensions/tests/${fx.b.test.id}/dimensions`, fx.a.adminToken)
-            .send({ name: 'Injected', description: 'cross tenant' });
-        expect(DENIED_STATUSES).toContain(res.status);
-        expect(await prisma.dimension.count({ where: { testId: fx.b.test.id } })).toBe(before);
-    });
-
-    test('admin of A cannot add a question to institute B dimension', async () => {
-        const before = await prisma.question.count({ where: { dimensionId: fx.b.dimension.id } });
-        const res = await api
-            .post(`/api/questions/dimensions/${fx.b.dimension.id}/questions`, fx.a.adminToken)
-            .send({ text: 'Injected question', scaleMin: 1, scaleMax: 5 });
-        expect(DENIED_STATUSES).toContain(res.status);
-        expect(await prisma.question.count({ where: { dimensionId: fx.b.dimension.id } })).toBe(before);
-    });
-
-    test('admin of A cannot soft delete an institute B dimension', async () => {
-        const res = await api.delete(`/api/dimensions/dimensions/${fx.b.dimension.id}`, fx.a.adminToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.dimension.findUnique({ where: { id: fx.b.dimension.id } });
-        expect(row?.isActive).toBe(true);
-    });
-
-    test('admin of A cannot soft delete an institute B question', async () => {
-        const res = await api.delete(`/api/questions/questions/${fx.b.question.id}`, fx.a.adminToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.question.findUnique({ where: { id: fx.b.question.id } });
-        expect(row?.isActive).toBe(true);
-    });
-});
+// SEC-06 (dimension and question ownership) was promoted out of this file once fixed.
+// Its active regression tests live in src/integration/assessment-structure-security.integration.spec.ts.
 
 describe('[PENDING SEC-10] reports must be restricted to authorized institute and student access', () => {
     // Caveat: today these report routes return 400 for every request (see the

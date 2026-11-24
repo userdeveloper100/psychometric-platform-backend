@@ -11,15 +11,43 @@ interface CreateQuestionInput {
 interface GetAllQuestionsOptions {
     page?: number;
     limit?: number;
+    instituteId: string;
 }
+
+/**
+ * SEC-06: a question is in scope only when its whole parent chain is active and belongs to the
+ * caller's institute: question -> dimension -> test -> institute.
+ */
+const questionInInstitute = (instituteId: string) => ({
+    isActive: true,
+    dimension: {
+        isActive: true,
+        test: { instituteId, isActive: true },
+    },
+});
+
+/** A dimension is in scope only when its parent test is active and belongs to the caller's institute. */
+const dimensionInInstitute = (instituteId: string) => ({
+    isActive: true,
+    test: { instituteId, isActive: true },
+});
+
+/** Fail-closed guard: an empty scope never falls through to an unscoped query. */
+const requireInstitute = (instituteId: string | undefined): string => {
+    if (!instituteId) throw new Error('Institute scope is required');
+    return instituteId;
+};
 
 export async function createQuestion(
     dimensionId: string,
-    { text, scaleMin = 1, scaleMax = 5 }: CreateQuestionInput
+    { text, scaleMin = 1, scaleMax = 5 }: CreateQuestionInput,
+    instituteId: string
 ) {
+    const scope = requireInstitute(instituteId);
     try {
-        const dimension = await prisma.dimension.findUnique({
-            where: { id: dimensionId },
+        // Parent dimension and test must be active and belong to the caller's institute before anything is written.
+        const dimension = await prisma.dimension.findFirst({
+            where: { id: dimensionId, ...dimensionInInstitute(scope) },
             select: { id: true }
         });
 
@@ -48,13 +76,11 @@ export async function createQuestion(
     }
 }
 
-export async function getDimensionQuestions(dimensionId: string) {
+export async function getDimensionQuestions(dimensionId: string, instituteId: string) {
+    const scope = requireInstitute(instituteId);
     try {
         const dimension = await prisma.dimension.findFirst({
-            where: {
-                id: dimensionId,
-                isActive: true
-            },
+            where: { id: dimensionId, ...dimensionInInstitute(scope) },
             select: { id: true }
         });
 
@@ -74,26 +100,36 @@ export async function getDimensionQuestions(dimensionId: string) {
 
 export async function getAllQuestions({
     page = 1,
-    limit = 10
-}: GetAllQuestionsOptions = {}) {
+    limit = 10,
+    instituteId
+}: GetAllQuestionsOptions) {
+    const scope = requireInstitute(instituteId);
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     return prisma.question.findMany({
-        where: { isActive: true },
+        where: questionInInstitute(scope),
         skip,
         take: currentLimit,
         orderBy: { createdAt: 'desc' }
     });
 }
 
-export async function deleteQuestion(questionId: string, userId: string) {
+/** Total for pagination, scoped the same way as getAllQuestions. */
+export async function countQuestions(instituteId: string) {
+    const scope = requireInstitute(instituteId);
+    return prisma.question.count({ where: questionInInstitute(scope) });
+}
+
+export async function deleteQuestion(questionId: string, userId: string, instituteId: string) {
+    const scope = requireInstitute(instituteId);
     try {
+        // Ownership is checked before the cascade. A foreign question is reported as not found and never touched.
         const question = await prisma.question.findFirst({
             where: {
                 id: questionId,
-                isActive: true
+                ...questionInInstitute(scope)
             }
         });
 

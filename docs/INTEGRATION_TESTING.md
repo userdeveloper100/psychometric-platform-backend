@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-24 (SEC-05):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-07) are promoted to active suites. The remaining security regression tests are **pending**: they fail against the current code on purpose, and that failure is the evidence for each audit finding.
+**Status as of 2026-11-24 (SEC-06):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07) are promoted to active suites. The remaining security regression tests are **pending**: they fail against the current code on purpose, and that failure is the evidence for each audit finding.
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -103,7 +103,7 @@ Expected last lines: `Database schema is up to date!` followed by `[integration-
 | Goal | Command |
 |---|---|
 | Build (type check of production code) | `npm run build` |
-| Unit tests (211 tests, 21 suites, no database) | `npm test` |
+| Unit tests (249 tests, 23 suites, no database) | `npm test` |
 | Integration tests (pass today) | `npm run test:integration` |
 | Pending security regressions (expected to fail today) | `npm run test:integration:pending` |
 | Apply migrations to the test database | `npm run test:db:setup` |
@@ -158,15 +158,15 @@ Run on 2026-11-24 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 21 suites) | 21 of 21 suites, **211 of 211 tests passed** |
-| `npm run test:integration` | 6 of 6 suites, **104 of 104 tests passed** |
-| `npm run test:integration:pending` | **9 of 9 failed, as designed** (see section 8) |
+| `npm test` (unit, 23 suites) | 23 of 23 suites, **249 of 249 tests passed** |
+| `npm run test:integration` | 7 of 7 suites, **131 of 131 tests passed** |
+| `npm run test:integration:pending` | **5 of 5 failed, as designed** (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (104)
+### 7.1 Passing integration tests (131)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -178,6 +178,10 @@ Run on 2026-11-24 against `psychometric_test`:
 
 **`invite-security.integration.spec.ts` (24):** SEC-05 regression tests, promoted from the pending suite once fixed. Every invite route requires the ADMIN role (STUDENT gets 403, no token gets 401). Invite listings (`GET /invites`, the test list and the student list) never return a `token` field or any token value. A token is returned once, in the 201 response to the admin who creates the invite, and it is a 64-character hex value. Admin A sees only institute A invites, and a query `instituteId` is ignored. Listing, creating or revoking against another institute returns 404 with no B data, and a foreign and a non-existent invite get the same response. Revoking an invite makes its token refused on submission. Unknown, expired and already-used tokens are refused with fixed messages, and the sent token is not echoed. A valid, unexpired invite still submits (201).
 
+**`assessment-structure-security.integration.spec.ts` (27):** SEC-06 regression tests, promoted from the pending suite once fixed. Dimension and question writes (create and delete) require ADMIN: STUDENT gets 403, no token gets 401. Admin A creates and deletes dimensions and questions in institute A (201 and 200). Admin A cannot create, list or delete anything in institute B: 404, and institute B rows stay active or unchanged. A dimension of another institute cannot take a question (404). An inactive own test blocks writes (404). Each write checks the full parent chain (test active and in the institute, dimension active, and question's dimension and test) before any write or cascade. Global dimension and question lists are scoped to the institute, and a query `instituteId` is ignored. A token without an institute fails closed (403 on the list, 404 or 403 on the rest). A body `instituteId` does not widen scope.
+
+**Read policy for dimensions and questions.** Reads are not restricted to ADMIN. Any authenticated user may read the dimensions and questions of their own institute. A STUDENT of institute A can read an A test's dimensions (200), and a foreign test or dimension returns 404. The reason is that a STUDENT is not yet linked to a test (DEC-03), so an ADMIN-only read would remove the only read path students have. Writes stay ADMIN-only. There are no update (PUT) routes for dimensions or questions, so the update case in the brief has no route to test. None was added.
+
 **`guards.integration.spec.ts` (21):** these are regression guards. They pass today and must keep passing. They are not evidence that an audit finding is fixed.
 
 | Area | What is guarded |
@@ -188,7 +192,7 @@ Run on 2026-11-24 against `psychometric_test`:
 | Institutes (SEC-02 area) | No token gives 401; admin reads own institute (200); STUDENT cannot list institutes (403) |
 | Responses (SEC-03 area) | No token gives 401 on a test-response read. Full SEC-03 coverage is in response-security.integration.spec.ts |
 | Invites (SEC-05 area) | Admin sees own test invites with no token; another institute's test invites are denied and do not expose the token. Full SEC-05 coverage is in invite-security.integration.spec.ts |
-| Dimensions (SEC-06 area) | Admin adds a dimension to own test (201); STUDENT cannot add one (403) |
+| Dimensions (SEC-06 area) | Admin adds a dimension to own test (201); STUDENT cannot add one (403). Full SEC-06 coverage is in assessment-structure-security.integration.spec.ts |
 | Reports (SEC-10 area) | STUDENT cannot read a test report (403) |
 
 ---
@@ -201,16 +205,12 @@ Run them with `npm run test:integration:pending`.
 
 | Audit ID | Scenario | Observed today | Status |
 |---|---|---|---|
-| SEC-06 | Admin of A adds a dimension to B test | **201** | Vulnerability confirmed |
-| SEC-06 | Admin of A adds a question to B dimension | **201** | Vulnerability confirmed |
-| SEC-06 | Admin of A soft deletes B dimension | **200** | Vulnerability confirmed |
-| SEC-06 | Admin of A soft deletes B question | **200** | Vulnerability confirmed |
 | SEC-10 | Admin of A reads B test report | **400** (functional defect, see below) | **Inconclusive**: the leak cannot be shown until the defect is fixed |
 | SEC-10 | Admin of A reads B student report | **400** (functional defect) | **Inconclusive** |
 | SEC-10 | Same-tenant student report returns one student | **400** (functional defect) | Functional failure |
 | FUNCTIONAL-DEFECT | Admin gets own test report | **400** (see below) | Functional defect, not a security finding |
 
-Counting: 9 pending tests in total: 7 security regressions (SEC-06 ×4, SEC-10 ×3), 1 DB-01 cascade defect that blocks the own-institute delete, and 1 functional report-parameter defect. SEC-01, SEC-02, SEC-03, SEC-05 and SEC-07 were fixed and promoted to active suites (`test-security.integration.spec.ts`, `institute-security.integration.spec.ts`, `response-security.integration.spec.ts`, `invite-security.integration.spec.ts`, `guards.integration.spec.ts`, `src/config/env.process.spec.ts`).
+Counting: 5 pending tests in total: 3 security regressions (SEC-10 ×3), 1 DB-01 cascade defect that blocks the own-institute delete, and 1 functional report-parameter defect. SEC-01, SEC-02, SEC-03, SEC-05, SEC-06 and SEC-07 were fixed and promoted to active suites (`test-security.integration.spec.ts`, `institute-security.integration.spec.ts`, `response-security.integration.spec.ts`, `invite-security.integration.spec.ts`, `assessment-structure-security.integration.spec.ts`, `guards.integration.spec.ts`, `src/config/env.process.spec.ts`).
 
 ### 8.1 Functional defect that blocks SEC-10 evidence
 
