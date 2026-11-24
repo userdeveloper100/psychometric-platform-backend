@@ -16,7 +16,25 @@ export interface SubmitResponsesInput {
 interface GetAllResponsesOptions {
     page?: number;
     limit?: number;
+    instituteId: string;
 }
+
+/**
+ * SEC-03: every response read and delete is scoped to the caller's institute through the
+ * relationship chain (response -> student, and response -> question -> dimension -> test).
+ * Both links must match, so a response is only visible when both parents belong to the institute.
+ */
+const responseInInstitute = (instituteId: string) => ({
+    isActive: true,
+    student: { instituteId },
+    question: { dimension: { test: { instituteId } } },
+});
+
+/** Fail-closed guard: an empty scope never falls through to an unscoped query. */
+const requireInstitute = (instituteId: string | undefined): string => {
+    if (!instituteId) throw new Error('Institute scope is required');
+    return instituteId;
+};
 
 export const submitResponses = async (data: SubmitResponsesInput, userId: string) => {
     const { token, studentId, responses } = data;
@@ -121,14 +139,22 @@ export const submitResponses = async (data: SubmitResponsesInput, userId: string
     }
 };
 
-export const getStudentResponses = async (studentId: string) => {
+export const getStudentResponses = async (studentId: string, instituteId: string) => {
     if (!studentId) throw new Error('Student ID is required');
+    const scope = requireInstitute(instituteId);
 
     try {
+        // A student outside the institute is reported as not found, so existence is not leaked.
+        const student = await prisma.student.findFirst({
+            where: { id: studentId, instituteId: scope },
+            select: { id: true }
+        });
+        if (!student) throw new Error('Student not found');
+
         return await prisma.response.findMany({
             where: {
-                studentId,
-                isActive: true
+                ...responseInInstitute(scope),
+                studentId
             },
             include: {
                 question: true
@@ -145,13 +171,21 @@ export const getStudentResponses = async (studentId: string) => {
     }
 };
 
-export const getTestResponses = async (testId: string) => {
+export const getTestResponses = async (testId: string, instituteId: string) => {
     if (!testId) throw new Error('Test ID is required');
+    const scope = requireInstitute(instituteId);
 
     try {
+        // A test outside the institute is reported as not found, so existence is not leaked.
+        const test = await prisma.psychometricTest.findFirst({
+            where: { id: testId, instituteId: scope, isActive: true },
+            select: { id: true }
+        });
+        if (!test) throw new Error('Test not found');
+
         return await prisma.response.findMany({
             where: {
-                isActive: true,
+                ...responseInInstitute(scope),
                 question: {
                     isActive: true,
                     dimension: {
@@ -188,15 +222,17 @@ export const getTestResponses = async (testId: string) => {
 
 export const getAllResponses = async ({
     page = 1,
-    limit = 10
-}: GetAllResponsesOptions = {}) => {
+    limit = 10,
+    instituteId
+}: GetAllResponsesOptions) => {
+    const scope = requireInstitute(instituteId);
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     try {
         return await prisma.response.findMany({
-            where: { isActive: true },
+            where: responseInInstitute(scope),
             skip,
             take: currentLimit,
             orderBy: { createdAt: 'desc' }
@@ -209,14 +245,22 @@ export const getAllResponses = async ({
     }
 };
 
-export const deleteResponse = async (responseId: string, userId: string) => {
+/** Total for pagination, with the same institute scope as getAllResponses so the count cannot leak other tenants. */
+export const countResponses = async (instituteId: string) => {
+    const scope = requireInstitute(instituteId);
+    return prisma.response.count({ where: responseInInstitute(scope) });
+};
+
+export const deleteResponse = async (responseId: string, userId: string, instituteId: string) => {
     if (!responseId) throw new Error('Response ID is required');
+    const scope = requireInstitute(instituteId);
 
     try {
+        // Scoped lookup first. A response in another institute is reported as not found and is never updated.
         const response = await prisma.response.findFirst({
             where: {
                 id: responseId,
-                isActive: true
+                ...responseInInstitute(scope)
             }
         });
 

@@ -846,12 +846,12 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | `SEC-07` Centralized Environment & JWT Secret Validation | `src/config/env.ts` validates configuration at startup; JWT secret must be at least 32 characters; hard-coded fallback secrets removed | `6c9e926` |
 | `SEC-02` Role & Tenant Authorization on Institute Endpoints | Reusable `authorizeRoles` middleware (401 with no user, 403 for the wrong role). All five institute routes require ADMIN. An ADMIN can view, update or delete only their own institute; a foreign institute returns 404 before any cascade runs. Listing is scoped to the requester's institute. Spoofed `instituteId` values in query or body are ignored | `security: protect institute endpoints with role authorization` |
 | `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
+| `SEC-03` Response Tenant Isolation & Role Authorization | Response list, student read, test read and delete require ADMIN (STUDENT gets 403). Every read and delete is scoped through student and test to the requester's institute; a foreign student, test or response returns 404 with no data; a missing institute fails closed. Student submission is unchanged | `security: enforce response tenant isolation` |
 
 ## Pending (`PENDING`)
 
 | Task | Scope |
 |---|---|
-| `SEC-03` | Enforce tenant isolation on assessment responses |
 | `SEC-05` | Protect invite tokens: remove from list responses, hash tokens, expiry and revocation |
 | `SEC-06` | Validate parent ownership for dimension and question writes and deletes |
 | `SEC-10` | Enforce tenant-scoped reporting and fix the `report.controller.ts` `:testId` parameter bug |
@@ -869,9 +869,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 19 of 19 suites, **166 of 166 tests passed** |
-| Integration (active) | `npm run test:integration` | 4 of 4 suites, **60 of 60 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **15 of 15 failing, as designed**: 13 security tests (`SEC-03`, `SEC-05`, `SEC-06`, `SEC-10`), 1 `DB-01` cascade defect (own-institute delete returns 500), and 1 functional defect in the report route parameter |
+| Unit | `npm test` | 20 of 20 suites, **187 of 187 tests passed** |
+| Integration (active) | `npm run test:integration` | 5 of 5 suites, **80 of 80 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **11 of 11 failing, as designed**: 9 security tests (`SEC-05` ×2, `SEC-06` ×4, `SEC-10` ×3), 1 `DB-01` cascade defect (own-institute delete returns 500), and 1 functional defect in the report route parameter |
 
 ---
 

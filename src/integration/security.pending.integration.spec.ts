@@ -46,30 +46,8 @@ describe('[PENDING DB-01, surfaced while fixing SEC-02] admin deletes their own 
     });
 });
 
-describe('[PENDING SEC-03] response reads and deletes must be restricted', () => {
-    test('a STUDENT cannot list all responses', async () => {
-        const res = await api.get('/api/responses', fx.a.studentToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-    });
-
-    test('admin of A cannot delete a response that belongs to institute B', async () => {
-        const res = await api.delete(`/api/responses/responses/${fx.b.response.id}`, fx.a.adminToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.response.findUnique({ where: { id: fx.b.response.id } });
-        expect(row?.isActive).toBe(true);
-    });
-
-    test('admin of A cannot read the responses of institute B test', async () => {
-        const res = await api.get(`/api/responses/responses/test/${fx.b.test.id}`, fx.a.adminToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-        expect(bodyText(res)).not.toContain(fx.b.student.email);
-    });
-
-    test('a STUDENT cannot read the responses of another student', async () => {
-        const res = await api.get(`/api/responses/responses/student/${fx.b.student.id}`, fx.a.studentToken);
-        expect(DENIED_STATUSES).toContain(res.status);
-    });
-});
+// SEC-03 (response tenant isolation) was promoted out of this file once fixed. Its active regression tests
+// live in src/integration/response-security.integration.spec.ts.
 
 describe('[PENDING SEC-05] invite tokens must not be exposed across tenants', () => {
     test('admin of A listing all invites does not receive the invite token of institute B', async () => {

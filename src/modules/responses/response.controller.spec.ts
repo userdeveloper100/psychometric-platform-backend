@@ -3,10 +3,6 @@ import * as responseService from './response.service';
 import { mockRequest, mockResponse, jsonBody, statusCode } from '../../test-utils/express-mocks';
 
 jest.mock('./response.service');
-jest.mock('../../config/prisma', () => ({
-    __esModule: true,
-    default: { response: { count: jest.fn().mockResolvedValue(8) } },
-}));
 
 const svc = responseService as jest.Mocked<typeof responseService>;
 
@@ -71,6 +67,7 @@ describe('response.controller', () => {
     describe('getAllResponses', () => {
         test('200 paginated', async () => {
             svc.getAllResponses.mockResolvedValue([{ id: 'r1' }] as any);
+            svc.countResponses.mockResolvedValue(8);
             const req = mockRequest({ query: { page: '1', limit: '10' } });
             const res = mockResponse();
 
@@ -100,6 +97,102 @@ describe('response.controller', () => {
             await responseController.deleteResponse(req, res);
 
             expect(statusCode(res)).toBe(200);
+        });
+    });
+
+    // SEC-03: the tenant scope comes only from req.user. Query, params and body values are ignored.
+    describe('SEC-03 tenant scope from req.user', () => {
+        const adminA = { userId: 'u1', role: 'ADMIN', instituteId: 'institute-a' };
+        const spoof = 'institute-b';
+
+        test('getAllResponses passes the requester institute and ignores a spoofed query instituteId', async () => {
+            svc.getAllResponses.mockResolvedValue([] as any);
+            svc.countResponses.mockResolvedValue(0);
+            const req = mockRequest({ query: { page: '1', limit: '10', instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await responseController.getAllResponses(req, res);
+
+            expect(svc.getAllResponses).toHaveBeenCalledWith({ page: 1, limit: 10, instituteId: 'institute-a' });
+            expect(svc.countResponses).toHaveBeenCalledWith('institute-a');
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('getAllResponses without an institute in the token is refused with 403', async () => {
+            svc.getAllResponses.mockRejectedValue(new Error('Institute scope is required'));
+            const req = mockRequest({ query: {}, user: { userId: 'u1', role: 'ADMIN' } });
+            const res = mockResponse();
+
+            await responseController.getAllResponses(req, res);
+
+            expect(statusCode(res)).toBe(403);
+        });
+
+        test('getStudentResponses passes the requester institute and ignores a spoofed query instituteId', async () => {
+            svc.getStudentResponses.mockResolvedValue([] as any);
+            const req = mockRequest({
+                params: { studentId: 'student-b' },
+                query: { instituteId: spoof },
+                user: adminA,
+            });
+            const res = mockResponse();
+
+            await responseController.getStudentResponses(req, res);
+
+            expect(svc.getStudentResponses).toHaveBeenCalledWith('student-b', 'institute-a');
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('getStudentResponses maps a student of another institute to 404', async () => {
+            svc.getStudentResponses.mockRejectedValue(new Error('Student not found'));
+            const req = mockRequest({ params: { studentId: 'student-b' }, user: adminA });
+            const res = mockResponse();
+
+            await responseController.getStudentResponses(req, res);
+
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('getTestResponses passes the requester institute and maps a foreign test to 404', async () => {
+            svc.getTestResponses.mockRejectedValue(new Error('Test not found'));
+            const req = mockRequest({ params: { testId: 'test-b' }, body: { instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await responseController.getTestResponses(req, res);
+
+            expect(svc.getTestResponses).toHaveBeenCalledWith('test-b', 'institute-a');
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('getTestResponses without an institute in the token is refused with 403', async () => {
+            svc.getTestResponses.mockRejectedValue(new Error('Institute scope is required'));
+            const req = mockRequest({ params: { testId: 'test-a' }, user: { userId: 'u1', role: 'ADMIN' } });
+            const res = mockResponse();
+
+            await responseController.getTestResponses(req, res);
+
+            expect(statusCode(res)).toBe(403);
+        });
+
+        test('deleteResponse passes the requester institute, ignores a body instituteId, and maps a foreign response to 404', async () => {
+            svc.deleteResponse.mockRejectedValue(new Error('Response not found'));
+            const req = mockRequest({ params: { id: 'response-b' }, body: { instituteId: spoof }, user: adminA });
+            const res = mockResponse();
+
+            await responseController.deleteResponse(req, res);
+
+            expect(svc.deleteResponse).toHaveBeenCalledWith('response-b', 'u1', 'institute-a');
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('deleteResponse without an institute in the token is refused with 403', async () => {
+            svc.deleteResponse.mockRejectedValue(new Error('Institute scope is required'));
+            const req = mockRequest({ params: { id: 'response-a' }, user: { userId: 'u1', role: 'ADMIN' } });
+            const res = mockResponse();
+
+            await responseController.deleteResponse(req, res);
+
+            expect(statusCode(res)).toBe(403);
         });
     });
 });

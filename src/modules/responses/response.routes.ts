@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as responseController from './response.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
+import { authorizeRoles } from '../../middleware/role.middleware';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.get('/', authenticateJWT, responseController.getAllResponses);
+router.get('/', authenticateJWT, authorizeRoles('ADMIN'), responseController.getAllResponses);
 
 /**
  * @swagger
@@ -117,7 +118,12 @@ router.post('/responses/submit', authenticateJWT, responseController.submitRespo
  *       500:
  *         description: Internal server error
  */
-router.get('/responses/student/:studentId', authenticateJWT, responseController.getStudentResponses);
+router.get(
+    '/responses/student/:studentId',
+    authenticateJWT,
+    authorizeRoles('ADMIN'),
+    responseController.getStudentResponses
+);
 /**
  * @swagger
  * /api/v1/responses/test/{testId}:
@@ -158,7 +164,7 @@ router.get('/responses/student/:studentId', authenticateJWT, responseController.
  *       500:
  *         description: Internal server error
  */
-router.get('/responses/test/:testId', authenticateJWT, responseController.getTestResponses);
+router.get('/responses/test/:testId', authenticateJWT, authorizeRoles('ADMIN'), responseController.getTestResponses);
 
 /**
  * @swagger
@@ -187,6 +193,6 @@ router.get('/responses/test/:testId', authenticateJWT, responseController.getTes
  *       500:
  *         description: Internal server error
  */
-router.delete('/responses/:id', authenticateJWT, responseController.deleteResponse);
+router.delete('/responses/:id', authenticateJWT, authorizeRoles('ADMIN'), responseController.deleteResponse);
 
 export default router;

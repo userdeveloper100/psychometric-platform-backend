@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import * as responseService from './response.service';
-import prisma from '../../config/prisma';
 import {
     successResponse,
     createdResponse,
     badRequestResponse,
+    forbiddenResponse,
     notFoundResponse,
     paginatedResponse,
     validatePagination,
@@ -16,6 +16,26 @@ import {
 const getUserId = (req: Request): string => {
     const user = (req as any).user;
     return user?.id || user?.userId || 'system';
+};
+
+/**
+ * SEC-03: the tenant comes only from the verified JWT. Query, params and body values are never read here.
+ * Returns '' when the token has no institute, and the service then fails closed.
+ */
+const getRequesterInstituteId = (req: Request): string => {
+    const user = (req as any).user;
+    return user?.instituteId || '';
+};
+
+/** Maps the service's scope and not-found errors to HTTP. Anything else is a server error. */
+const handleScopedError = (res: Response, error: any, fallback: string): Response => {
+    if (error.message === 'Institute scope is required') {
+        return forbiddenResponse(res, 'Forbidden: Institute scope is required');
+    }
+    if (error.message === 'Student not found' || error.message === 'Test not found' || error.message === 'Response not found') {
+        return notFoundResponse(res, error.message);
+    }
+    return serverErrorResponse(res, error.message || fallback);
 };
 
 export const submitResponses = async (req: Request, res: Response): Promise<Response> => {
@@ -51,10 +71,10 @@ export const getStudentResponses = async (req: Request, res: Response): Promise<
             return badRequestResponse(res, 'Student ID is required');
         }
 
-        const data = await responseService.getStudentResponses(studentId);
+        const data = await responseService.getStudentResponses(studentId, getRequesterInstituteId(req));
         return successResponse(res, data, 'Student responses fetched successfully');
     } catch (error: any) {
-        return serverErrorResponse(res, error.message || 'Failed to fetch student responses');
+        return handleScopedError(res, error, 'Failed to fetch student responses');
     }
 };
 
@@ -66,10 +86,10 @@ export const getTestResponses = async (req: Request, res: Response): Promise<Res
             return badRequestResponse(res, 'Test ID is required');
         }
 
-        const data = await responseService.getTestResponses(testId);
+        const data = await responseService.getTestResponses(testId, getRequesterInstituteId(req));
         return successResponse(res, data, 'Test responses fetched successfully');
     } catch (error: any) {
-        return serverErrorResponse(res, error.message || 'Failed to fetch test responses');
+        return handleScopedError(res, error, 'Failed to fetch test responses');
     }
 };
 
@@ -83,15 +103,20 @@ export const getAllResponses = async (req: Request, res: Response): Promise<Resp
             return badRequestResponse(res, validation.error);
         }
 
+        const instituteId = getRequesterInstituteId(req);
         const skip = calculateSkip(page, limit);
-        const data = await responseService.getAllResponses({ page: Number(page), limit: Number(limit) });
+        const data = await responseService.getAllResponses({
+            page: Number(page),
+            limit: Number(limit),
+            instituteId
+        });
 
-        const total = await prisma.response.count({ where: { isActive: true } });
+        const total = await responseService.countResponses(instituteId);
         const pagination = calculatePagination(page, limit, total);
 
         return paginatedResponse(res, data, pagination, 'Responses fetched successfully');
     } catch (error: any) {
-        return serverErrorResponse(res, error.message || 'Failed to fetch responses');
+        return handleScopedError(res, error, 'Failed to fetch responses');
     }
 };
 
@@ -104,12 +129,9 @@ export const deleteResponse = async (req: Request, res: Response): Promise<Respo
             return badRequestResponse(res, 'Response ID is required');
         }
 
-        const result = await responseService.deleteResponse(id, userId);
+        const result = await responseService.deleteResponse(id, userId, getRequesterInstituteId(req));
         return successResponse(res, result, 'Response deleted successfully');
     } catch (error: any) {
-        if (error.message === 'Response not found') {
-            return notFoundResponse(res, error.message);
-        }
-        return serverErrorResponse(res, error.message || 'Failed to delete response');
+        return handleScopedError(res, error, 'Failed to delete response');
     }
 };
