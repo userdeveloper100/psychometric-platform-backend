@@ -92,7 +92,7 @@ router.get(
     '/reports/student/:studentId/test/:testId',
     authenticateJWT,
     authorizeRoles('ADMIN'),
-    reportController.getTestReport
+    reportController.getStudentReport
 );
 
 /**

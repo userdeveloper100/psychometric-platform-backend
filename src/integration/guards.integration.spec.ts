@@ -120,10 +120,8 @@ describe('dimension creation: correct cases (guards SEC-06 area)', () => {
 });
 
 describe('reports: correct cases (guards SEC-10 area)', () => {
-    // Note: the report handler currently returns 400 for every valid request because the
-    // route param is :testId but the controller reads req.params.id. That functional defect
-    // is pending in security.pending.integration.spec.ts, so this guard only covers the
-    // role check, which runs before the handler.
+    // This guard covers the role check, which runs before the handler. Full SEC-10 coverage,
+    // including tenant scoping and inactive records, is in report-security.integration.spec.ts.
     test('a STUDENT cannot read a test report (route role check)', async () => {
         const res = await api.get(`/api/reports/reports/test/${fx.a.test.id}`, fx.a.studentToken);
         expect(res.status).toBe(403);
