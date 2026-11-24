@@ -13,6 +13,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:db:setup": "ts-node --transpile-only scripts/integration-db-setup.ts",
+    "test:integration": "jest --config jest.integration.config.ts --runInBand",
+    "test:integration:pending": "jest --config jest.security-pending.config.ts --runInBand",
     "swagger:generate": "node ./scripts/add-swagger-to-routes.js"
   },
   "dependencies": {
