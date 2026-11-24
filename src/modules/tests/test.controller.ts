@@ -134,25 +134,23 @@ export const getAllTests = async (
     }
 };
 
+// SEC-01: the institute always comes from the authenticated user. Any instituteId in the request
+// body or query is ignored, so it cannot be used to publish or delete another institute's test.
 export const publishTest = async (req: Request, res: Response): Promise<Response> => {
     try {
         const testId = req.params.id;
-        const instituteId =
-            (req.body.instituteId as string) ||
-            ((req as any).user?.instituteId as string);
         const user = (req as any).user;
 
         if (!testId) {
             return badRequestResponse(res, 'Test ID is required');
         }
 
-        if (!user?.role || !user?.instituteId || !instituteId) {
+        if (!user?.role || !user?.instituteId) {
             return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const test = await testService.publishTest({
             testId,
-            instituteId,
             requestedBy: {
                 role: user.role,
                 instituteId: user.instituteId
@@ -177,22 +175,18 @@ export const publishTest = async (req: Request, res: Response): Promise<Response
 export const deleteTest = async (req: Request, res: Response): Promise<Response> => {
     try {
         const testId = req.params.id;
-        const instituteId =
-            (req.body.instituteId as string) ||
-            ((req as any).user?.instituteId as string);
         const user = (req as any).user;
 
         if (!testId) {
             return badRequestResponse(res, 'Test ID is required');
         }
 
-        if (!user?.role || !user?.instituteId || !instituteId) {
+        if (!user?.role || !user?.instituteId) {
             return unauthorizedResponse(res, 'Unauthorized');
         }
 
         const test = await testService.deleteTest({
             testId,
-            instituteId,
             requestedBy: {
                 role: user.role,
                 instituteId: user.instituteId

@@ -28,25 +28,8 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-describe('[PENDING SEC-01] test publish and delete must not cross tenants', () => {
-    test('admin of A cannot publish B test by sending B instituteId in the body', async () => {
-        const res = await api
-            .patch(`/api/tests/${fx.b.test.id}/publish`, fx.a.adminToken)
-            .send({ instituteId: fx.b.institute.id });
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.psychometricTest.findUnique({ where: { id: fx.b.test.id } });
-        expect(row?.status).toBe('DRAFT');
-    });
-
-    test('admin of A cannot delete B test by sending B instituteId in the body', async () => {
-        const res = await api
-            .delete(`/api/tests/${fx.b.test.id}`, fx.a.adminToken)
-            .send({ instituteId: fx.b.institute.id });
-        expect(DENIED_STATUSES).toContain(res.status);
-        const row = await prisma.psychometricTest.findUnique({ where: { id: fx.b.test.id } });
-        expect(row?.isActive).toBe(true);
-    });
-});
+// SEC-01 (test publish and delete tenant ownership) was promoted out of this file once fixed.
+// Its active regression tests live in src/integration/test-security.integration.spec.ts.
 
 describe('[PENDING SEC-02] institute endpoints must enforce roles and tenant boundaries', () => {
     test('a STUDENT cannot create an institute', async () => {

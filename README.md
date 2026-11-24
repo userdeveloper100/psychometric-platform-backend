@@ -833,6 +833,48 @@ Potential future capabilities include:
 
 ---
 
+# Security Remediation & Implementation Progress
+
+Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each task is completed one at a time. A regression test that passes does not by itself mean a finding is fixed. Status is updated only after the fix is committed.
+
+## Completed (`DONE`)
+
+| Task | Summary | Reference |
+|---|---|---|
+| Backend Implementation Audit & Roadmap | Five audit documents in `docs/` | `94cc856` |
+| `SEC-11` Integration Test Infrastructure | Isolated `psychometric_test` database guard, fixtures, supertest harness | `9fa8803`, `docs/INTEGRATION_TESTING.md` |
+| `SEC-07` Centralized Environment & JWT Secret Validation | `src/config/env.ts` validates configuration at startup; JWT secret must be at least 32 characters; hard-coded fallback secrets removed | `6c9e926` |
+| `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
+
+## Pending (`PENDING`)
+
+| Task | Scope |
+|---|---|
+| `SEC-02` | Enforce role and tenant authorization on institute endpoints |
+| `SEC-03` | Enforce tenant isolation on assessment responses |
+| `SEC-05` | Protect invite tokens: remove from list responses, hash tokens, expiry and revocation |
+| `SEC-06` | Validate parent ownership for dimension and question writes and deletes |
+| `SEC-10` | Enforce tenant-scoped reporting and fix the `report.controller.ts` `:testId` parameter bug |
+| `DB-01` | Fix soft-delete cascade lookup relationships |
+| `DB-02` | Allow valid student re-invitations after soft delete |
+| `DB-03` | Enforce assessment response question and student integrity |
+| `DEC-01` | Platform model decision (institute and student platform, or recruiting SaaS) |
+| `DEC-02` | Signup model decision (open signup or invite-only) |
+| `DEC-03` | Student identity model decision (how students authenticate to submit answers) |
+| `DEC-04` | API versioning decision (`/api` or `/api/v1`) |
+
+## Current Test Baseline
+
+Counts from the last run on this branch. Run them as described in `docs/INTEGRATION_TESTING.md`.
+
+| Suite | Command | Result |
+|---|---|---|
+| Unit | `npm test` | 17 of 17 suites, **146 of 146 tests passed** |
+| Integration (active) | `npm run test:integration` | 3 of 3 suites, **44 of 44 tests passed** |
+| Pending security regressions | `npm run test:integration:pending` | **18 of 18 failing, as designed**: 17 security tests (`SEC-02`, `SEC-03`, `SEC-05`, `SEC-06`, `SEC-10`) plus 1 functional defect in the report route parameter |
+
+---
+
 # License
 
 This project is currently under development.

@@ -135,4 +135,97 @@ describe('test.controller', () => {
             expect(statusCode(res)).toBe(404);
         });
     });
+
+    // SEC-01: the institute comes only from req.user. A body or query instituteId is ignored.
+    describe('SEC-01 institute ownership for publish and delete', () => {
+        const spoofed = { instituteId: 'institute-b' };
+
+        test('publishTest passes the institute from req.user and ignores a spoofed body instituteId', async () => {
+            svc.publishTest.mockResolvedValue({ id: 't1', status: 'PUBLISHED' } as any);
+            const req = mockRequest({ params: { id: 't1' }, body: spoofed, user: adminUser });
+            const res = mockResponse();
+
+            await testController.publishTest(req, res);
+
+            expect(svc.publishTest).toHaveBeenCalledWith({
+                testId: 't1',
+                requestedBy: { role: 'ADMIN', instituteId: 'i1' },
+            });
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('publishTest maps another institute test ("Test not found") to 404', async () => {
+            svc.publishTest.mockRejectedValue(new Error('Test not found'));
+            const req = mockRequest({ params: { id: 'test-of-b' }, body: spoofed, user: adminUser });
+            const res = mockResponse();
+
+            await testController.publishTest(req, res);
+
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('publishTest maps a STUDENT to 403', async () => {
+            svc.publishTest.mockRejectedValue(new Error('Only ADMIN users can publish tests'));
+            const req = mockRequest({ params: { id: 't1' }, user: { role: 'STUDENT', instituteId: 'i1' } });
+            const res = mockResponse();
+
+            await testController.publishTest(req, res);
+
+            expect(statusCode(res)).toBe(403);
+        });
+
+        test('publishTest without an authenticated user returns 401 and never calls the service', async () => {
+            const req = mockRequest({ params: { id: 't1' }, body: spoofed });
+            const res = mockResponse();
+
+            await testController.publishTest(req, res);
+
+            expect(statusCode(res)).toBe(401);
+            expect(svc.publishTest).not.toHaveBeenCalled();
+        });
+
+        test('deleteTest passes the institute from req.user and ignores a spoofed body instituteId', async () => {
+            svc.deleteTest.mockResolvedValue({ success: true } as any);
+            const req = mockRequest({ params: { id: 't1' }, body: spoofed, user: adminUser });
+            const res = mockResponse();
+
+            await testController.deleteTest(req, res);
+
+            expect(svc.deleteTest).toHaveBeenCalledWith({
+                testId: 't1',
+                requestedBy: { role: 'ADMIN', instituteId: 'i1' },
+            });
+            expect(statusCode(res)).toBe(200);
+        });
+
+        test('deleteTest maps another institute test ("Test not found") to 404', async () => {
+            svc.deleteTest.mockRejectedValue(new Error('Test not found'));
+            const req = mockRequest({ params: { id: 'test-of-b' }, body: spoofed, user: adminUser });
+            const res = mockResponse();
+
+            await testController.deleteTest(req, res);
+
+            expect(statusCode(res)).toBe(404);
+        });
+
+        test('deleteTest maps a STUDENT to 403', async () => {
+            svc.deleteTest.mockRejectedValue(new Error('Only ADMIN users can delete tests'));
+            const req = mockRequest({ params: { id: 't1' }, user: { role: 'STUDENT', instituteId: 'i1' } });
+            const res = mockResponse();
+
+            await testController.deleteTest(req, res);
+
+            expect(statusCode(res)).toBe(403);
+        });
+
+        test('deleteTest without an authenticated user returns 401 and never calls the service', async () => {
+            const req = mockRequest({ params: { id: 't1' }, body: spoofed });
+            const res = mockResponse();
+
+            await testController.deleteTest(req, res);
+
+            expect(statusCode(res)).toBe(401);
+            expect(svc.deleteTest).not.toHaveBeenCalled();
+        });
+    });
 });

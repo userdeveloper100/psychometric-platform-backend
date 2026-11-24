@@ -56,9 +56,9 @@ describe('test publish and delete: correct cases (guards SEC-01 area)', () => {
         expect(row?.status).toBe('PUBLISHED');
     });
 
-    test('admin publishing another institute test without a body instituteId is refused with 403', async () => {
+    test('admin publishing another institute test is refused with 404 (no existence leak)', async () => {
         const res = await api.patch(`/api/tests/${fx.b.test.id}/publish`, fx.a.adminToken).send({});
-        expect(res.status).toBe(403);
+        expect(res.status).toBe(404);
         const row = await prisma.psychometricTest.findUnique({ where: { id: fx.b.test.id } });
         expect(row?.status).toBe('DRAFT');
     });

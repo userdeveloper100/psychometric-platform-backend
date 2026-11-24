@@ -39,9 +39,9 @@ interface GetAllTestsOptions {
     limit?: number;
 }
 
-interface PublishTestInput {
+// The tenant scope comes only from the authenticated user (req.user). Request payloads never supply it.
+interface TestActionInput {
     testId: string;
-    instituteId: string;
     requestedBy: {
         role: UserRole;
         instituteId: string;
@@ -180,21 +180,18 @@ export async function getAllTests({
 
 // ─── Publish Test ─────────────────────────────────────────────────────────────
 
-export async function publishTest({
-    testId,
-    instituteId,
-    requestedBy
-}: PublishTestInput) {
+export async function publishTest({ testId, requestedBy }: TestActionInput) {
     try {
         // Guard: only ADMIN users can publish tests
         if (requestedBy.role !== UserRole.ADMIN) {
             throw new Error('Only ADMIN users can publish tests');
         }
 
-        // Fetch existing test
+        // Scoped lookup: a test from another institute is indistinguishable from a missing one.
         const existingTest = await prisma.psychometricTest.findFirst({
             where: {
                 id: testId,
+                instituteId: requestedBy.instituteId,
                 isActive: true
             },
             select: { id: true, status: true, instituteId: true }
@@ -202,11 +199,6 @@ export async function publishTest({
 
         if (!existingTest) {
             throw new Error('Test not found');
-        }
-
-        // Guard: admin can only publish tests from their own institute
-        if (existingTest.instituteId !== instituteId) {
-            throw new Error('You can only publish tests from your own institute');
         }
 
         // Guard: prevent re-publishing already published tests
@@ -236,23 +228,19 @@ export async function publishTest({
 
 // ─── Delete Test ──────────────────────────────────────────────────────────
 
-export async function deleteTest({
-    testId,
-    instituteId,
-    requestedBy
-}: PublishTestInput) {
+export async function deleteTest({ testId, requestedBy }: TestActionInput) {
     try {
         // Guard: only ADMIN users can delete tests
         if (requestedBy.role !== UserRole.ADMIN) {
             throw new Error('Only ADMIN users can delete tests');
         }
 
-        // Guard: admin can only delete tests from their own institute
+        // Scoped lookup: a test from another institute is indistinguishable from a missing one.
         const existingTest = await prisma.psychometricTest.findFirst({
             where: {
                 id: testId,
                 isActive: true,
-                instituteId
+                instituteId: requestedBy.instituteId
             }
         });
 
