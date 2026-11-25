@@ -37,6 +37,7 @@ interface GetInstituteTestsOptions {
 interface GetAllTestsOptions {
     page?: number;
     limit?: number;
+    instituteId: string;
 }
 
 // The tenant scope comes only from the authenticated user (req.user). Request payloads never supply it.
@@ -163,16 +164,22 @@ export async function getInstituteTests({
     }
 }
 
+/**
+ * Step 12 release gate: the list is limited to the requester's institute. It used to return every
+ * institute's tests. Fail-closed: an empty scope throws and never queries.
+ */
 export async function getAllTests({
     page = 1,
-    limit = 10
-}: GetAllTestsOptions = {}) {
+    limit = 10,
+    instituteId
+}: GetAllTestsOptions) {
+    if (!instituteId) throw new Error('Institute scope is required');
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     return prisma.psychometricTest.findMany({
-        where: { isActive: true },
+        where: { isActive: true, instituteId },
         skip,
         take: currentLimit,
         orderBy: { createdAt: 'desc' }

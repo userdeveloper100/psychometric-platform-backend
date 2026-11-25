@@ -14,6 +14,7 @@ import {
     serverErrorResponse
 } from '../../utils/response-helpers';
 import { ErrorCode } from '../../types/api-response.types';
+import { logSecurityEvent } from '../../utils/security-logger';
 
 // ─── Create Institute ─────────────────────────────────────────────────────────
 
@@ -173,11 +174,30 @@ export const deleteInstitute = async (req: Request, res: Response): Promise<Resp
         const { id } = req.params;
         const userId = getUserId(req);
 
-        const result = await instituteService.deleteInstitute(id, userId, getRequesterInstituteId(req));
+        const requesterInstituteId = getRequesterInstituteId(req);
+        const result = await instituteService.deleteInstitute(id, userId, requesterInstituteId);
+
+        logSecurityEvent('sensitive_admin_action', {
+            userId,
+            instituteId: requesterInstituteId,
+            role: (req as any).user?.role,
+            action: 'delete_institute',
+            resourceType: 'institute',
+            resourceId: id,
+        });
 
         return successResponse(res, result, 'Institute deleted successfully');
     } catch (error: any) {
         if (error.message === 'Institute not found') {
+            logSecurityEvent('authorization_denied', {
+                userId: getUserId(req),
+                instituteId: getRequesterInstituteId(req),
+                role: (req as any).user?.role,
+                action: 'delete_institute',
+                resourceType: 'institute',
+                resourceId: req.params.id,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to delete institute');

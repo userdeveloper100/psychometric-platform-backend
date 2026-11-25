@@ -61,7 +61,7 @@ describe('test.controller', () => {
     describe('getInstituteTests', () => {
         test('200 paginated', async () => {
             svc.getInstituteTests.mockResolvedValue({ data: [{ id: 't1' }], meta } as any);
-            const req = mockRequest({ query: { instituteId: 'i1', page: '1', limit: '10' } });
+            const req = mockRequest({ query: { page: '1', limit: '10' }, user: adminUser });
             const res = mockResponse();
 
             await testController.getInstituteTests(req, res);
@@ -70,17 +70,29 @@ describe('test.controller', () => {
             expect(jsonBody(res).meta.pagination.total).toBe(9);
         });
 
-        test('400 when instituteId missing', async () => {
-            const req = mockRequest({ query: {} });
+        // Step 12 release gate: the tenant comes only from the token. A query or path instituteId is ignored.
+        test('scopes to the token institute and ignores a query instituteId', async () => {
+            svc.getInstituteTests.mockResolvedValue({ data: [], meta } as any);
+            const req = mockRequest({ query: { instituteId: 'institute-b' }, user: adminUser });
             const res = mockResponse();
 
             await testController.getInstituteTests(req, res);
 
-            expect(statusCode(res)).toBe(400);
+            expect(svc.getInstituteTests).toHaveBeenCalledWith(expect.objectContaining({ instituteId: 'i1' }));
+        });
+
+        test('403 when the token has no institute, even if a query instituteId is sent', async () => {
+            const req = mockRequest({ query: { instituteId: 'i1' }, user: { userId: 'u1', role: 'ADMIN' } });
+            const res = mockResponse();
+
+            await testController.getInstituteTests(req, res);
+
+            expect(statusCode(res)).toBe(403);
+            expect(svc.getInstituteTests).not.toHaveBeenCalled();
         });
 
         test('400 on invalid status filter', async () => {
-            const req = mockRequest({ query: { instituteId: 'i1', status: 'BOGUS' } });
+            const req = mockRequest({ query: { status: 'BOGUS' }, user: adminUser });
             const res = mockResponse();
 
             await testController.getInstituteTests(req, res);
@@ -92,13 +104,34 @@ describe('test.controller', () => {
     describe('getAllTests', () => {
         test('200 paginated', async () => {
             svc.getAllTests.mockResolvedValue([{ id: 't1' }] as any);
-            const req = mockRequest({ query: { page: '1', limit: '10' } });
+            const req = mockRequest({ query: { page: '1', limit: '10' }, user: adminUser });
             const res = mockResponse();
 
             await testController.getAllTests(req, res);
 
             expect(statusCode(res)).toBe(200);
             expect(jsonBody(res).meta.pagination.total).toBe(9);
+        });
+
+        // Step 12 release gate: the list was unscoped and returned every institute's tests.
+        test('is scoped to the token institute and ignores a query instituteId', async () => {
+            svc.getAllTests.mockResolvedValue([] as any);
+            const req = mockRequest({ query: { instituteId: 'institute-b' }, user: adminUser });
+            const res = mockResponse();
+
+            await testController.getAllTests(req, res);
+
+            expect(svc.getAllTests).toHaveBeenCalledWith(expect.objectContaining({ instituteId: 'i1' }));
+        });
+
+        test('403 when the token has no institute, and no query runs', async () => {
+            const req = mockRequest({ query: {}, user: { userId: 'u1', role: 'STUDENT' } });
+            const res = mockResponse();
+
+            await testController.getAllTests(req, res);
+
+            expect(statusCode(res)).toBe(403);
+            expect(svc.getAllTests).not.toHaveBeenCalled();
         });
     });
 

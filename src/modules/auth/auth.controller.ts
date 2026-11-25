@@ -100,11 +100,17 @@ export const getAllUsers = async (req: Request, res: Response): Promise<Response
             return badRequestResponse(res, validation.error);
         }
 
+        // Release gate (Step 12): the tenant comes only from the verified token. The count uses the same scope.
+        const instituteId = authReq.user.instituteId;
+        if (!instituteId) {
+            return forbiddenResponse(res, 'Forbidden: Institute scope is required');
+        }
+
         const skip = calculateSkip(page, limit);
-        const users = await authService.getAllUsers({ page: Number(page), limit: Number(limit) });
+        const users = await authService.getAllUsers({ page: Number(page), limit: Number(limit), instituteId });
 
         // Calculate total for pagination metadata
-        const total = await prisma.user.count({ where: { isActive: true } });
+        const total = await prisma.user.count({ where: { isActive: true, instituteId } });
         const pagination = calculatePagination(page, limit, total);
 
         return paginatedResponse(res, users, pagination, 'Users fetched successfully');

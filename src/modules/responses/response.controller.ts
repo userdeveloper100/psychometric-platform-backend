@@ -12,6 +12,7 @@ import {
     calculateSkip,
     serverErrorResponse
 } from '../../utils/response-helpers';
+import { logSecurityEvent } from '../../utils/security-logger';
 
 const getUserId = (req: Request): string => {
     const user = (req as any).user;
@@ -59,6 +60,14 @@ const SUBMISSION_REFUSALS: readonly string[] = [
 const isSubmissionRefusal = (message: string): boolean =>
     SUBMISSION_REFUSALS.includes(message) || /^Answer for question .+ must be between /.test(message);
 
+/** Refusals about the invite itself, which are logged as security events (Step 12). The token is never logged. */
+const INVITE_REFUSALS: readonly string[] = [
+    'Invalid or inactive invite token',
+    'Responses already submitted for this invite',
+    'Invite has expired',
+    'Student does not match invite',
+];
+
 export const submitResponses = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { token, studentId, responses } = req.body;
@@ -76,6 +85,17 @@ export const submitResponses = async (req: Request, res: Response): Promise<Resp
         return createdResponse(res, result, 'Responses submitted successfully');
     } catch (error: any) {
         if (isSubmissionRefusal(error.message)) {
+            if (INVITE_REFUSALS.includes(error.message)) {
+                // Only the fixed refusal reason is logged. The token, the body and the answers are not.
+                logSecurityEvent('invite_validation_failed', {
+                    userId: (req as any).user?.userId,
+                    instituteId: (req as any).user?.instituteId,
+                    role: (req as any).user?.role,
+                    action: 'submit_responses',
+                    resourceType: 'invite',
+                    reason: error.message,
+                });
+            }
             return badRequestResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to submit responses');

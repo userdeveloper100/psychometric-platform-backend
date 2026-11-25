@@ -12,6 +12,7 @@ import {
     serverErrorResponse
 } from '../../utils/response-helpers';
 import { ErrorCode } from '../../types/api-response.types';
+import { logSecurityEvent } from '../../utils/security-logger';
 
 // ─── Get Students ─────────────────────────────────────────────────────────────
 
@@ -156,9 +157,27 @@ export const deleteStudent = async (
 
         const deleted = await studentService.deleteStudent(id, instituteId, userId);
 
+        logSecurityEvent('sensitive_admin_action', {
+            userId,
+            instituteId,
+            role: user?.role,
+            action: 'delete_student',
+            resourceType: 'student',
+            resourceId: id,
+        });
+
         return successResponse(res, deleted, 'Student deleted successfully');
     } catch (error: any) {
         if (error.message === 'Student not found') {
+            logSecurityEvent('authorization_denied', {
+                userId: (req as any).user?.userId,
+                instituteId: (req as any).user?.instituteId,
+                role: (req as any).user?.role,
+                action: 'delete_student',
+                resourceType: 'student',
+                resourceId: req.params.id,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to delete student');

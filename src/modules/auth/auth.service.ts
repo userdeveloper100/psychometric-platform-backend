@@ -19,6 +19,7 @@ interface LoginInput {
 interface GetAllUsersOptions {
     page?: number;
     limit?: number;
+    instituteId: string;
 }
 
 export async function registerInstituteAdmin({
@@ -118,16 +119,22 @@ export async function login({ email, password }: LoginInput) {
     }
 }
 
+/**
+ * Step 12 release gate: the user list is limited to the requester's institute. It used to list the users of every
+ * institute. Fail-closed: an empty scope throws and never queries.
+ */
 export async function getAllUsers({
     page = 1,
-    limit = 10
-}: GetAllUsersOptions = {}) {
+    limit = 10,
+    instituteId
+}: GetAllUsersOptions) {
+    if (!instituteId) throw new Error('Institute scope is required');
     const currentPage = Number(page) || 1;
     const currentLimit = Number(limit) || 10;
     const skip = (currentPage - 1) * currentLimit;
 
     return prisma.user.findMany({
-        where: { isActive: true },
+        where: { isActive: true, instituteId },
         skip,
         take: currentLimit,
         orderBy: { createdAt: 'desc' },
@@ -142,10 +149,11 @@ export async function getAllUsers({
     });
 }
 
-// Add to auth.service.ts
-export async function deleteUser(userId: string, adminId: string) {
+// Not routed. Scoped anyway (Step 12 release gate): an admin can only deactivate a user of their own institute.
+export async function deleteUser(userId: string, adminId: string, instituteId: string) {
+    if (!instituteId) throw new Error('Institute scope is required');
     const user = await prisma.user.findFirst({
-        where: { id: userId, isActive: true }
+        where: { id: userId, instituteId, isActive: true }
     });
     
     if (!user) {

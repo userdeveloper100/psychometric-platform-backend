@@ -16,6 +16,7 @@ import {
     calculateSkip,
     serverErrorResponse
 } from '../../utils/response-helpers';
+import { logSecurityEvent } from '../../utils/security-logger';
 
 export const createTest = async (req: Request, res: Response): Promise<Response> => {
     try {
@@ -59,9 +60,8 @@ export const getInstituteTests = async (
     res: Response
 ): Promise<Response> => {
     try {
-        const instituteId =
-            (req.query.instituteId as string) ||
-            (req.params.instituteId as string);
+        // Release gate (Step 12): the tenant comes only from the verified token. A query or path instituteId is ignored.
+        const instituteId = (req as any).user?.instituteId as string | undefined;
 
         const page = (req.query.page as string) || '1';
         const limit = (req.query.limit as string) || '10';
@@ -69,7 +69,7 @@ export const getInstituteTests = async (
         const statusRaw = (req.query.status as string | undefined)?.toUpperCase();
 
         if (!instituteId) {
-            return badRequestResponse(res, 'instituteId is required');
+            return forbiddenResponse(res, 'Forbidden: Institute scope is required');
         }
 
         const validation = validatePagination(page, limit);
@@ -122,10 +122,16 @@ export const getAllTests = async (
             return badRequestResponse(res, validation.error);
         }
 
-        const skip = calculateSkip(page, limit);
-        const data = await testService.getAllTests({ page: Number(page), limit: Number(limit) });
+        // Release gate (Step 12): tenant from the verified token only, and the count uses the same scope.
+        const instituteId = (req as any).user?.instituteId as string | undefined;
+        if (!instituteId) {
+            return forbiddenResponse(res, 'Forbidden: Institute scope is required');
+        }
 
-        const total = await prisma.psychometricTest.count({ where: { isActive: true } });
+        const skip = calculateSkip(page, limit);
+        const data = await testService.getAllTests({ page: Number(page), limit: Number(limit), instituteId });
+
+        const total = await prisma.psychometricTest.count({ where: { isActive: true, instituteId } });
         const pagination = calculatePagination(page, limit, total);
 
         return paginatedResponse(res, data, pagination, 'Tests fetched successfully');
@@ -158,12 +164,29 @@ export const publishTest = async (req: Request, res: Response): Promise<Response
             }
         });
 
+        logSecurityEvent('sensitive_admin_action', {
+            userId: user.userId,
+            instituteId: user.instituteId,
+            role: user.role,
+            action: 'publish_test',
+            resourceType: 'test',
+            resourceId: testId,
+        });
         return successResponse(res, test, 'Test published successfully');
     } catch (error: any) {
         if (error.message.includes('Only ADMIN') || error.message.includes('own institute')) {
             return forbiddenResponse(res, error.message);
         }
         if (error.message === 'Test not found') {
+            logSecurityEvent('authorization_denied', {
+                userId: (req as any).user?.userId,
+                instituteId: (req as any).user?.instituteId,
+                role: (req as any).user?.role,
+                action: 'publish_test',
+                resourceType: 'test',
+                resourceId: req.params.id,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         if (error.message === 'Test is already published') {
@@ -195,12 +218,29 @@ export const deleteTest = async (req: Request, res: Response): Promise<Response>
             }
         });
 
+        logSecurityEvent('sensitive_admin_action', {
+            userId: user.userId,
+            instituteId: user.instituteId,
+            role: user.role,
+            action: 'delete_test',
+            resourceType: 'test',
+            resourceId: testId,
+        });
         return successResponse(res, test, 'Test deleted successfully');
     } catch (error: any) {
         if (error.message.includes('Only ADMIN') || error.message.includes('own institute')) {
             return forbiddenResponse(res, error.message);
         }
         if (error.message === 'Test not found') {
+            logSecurityEvent('authorization_denied', {
+                userId: (req as any).user?.userId,
+                instituteId: (req as any).user?.instituteId,
+                role: (req as any).user?.role,
+                action: 'delete_test',
+                resourceType: 'test',
+                resourceId: req.params.id,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to delete test');

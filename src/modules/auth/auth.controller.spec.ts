@@ -90,13 +90,37 @@ describe('auth.controller', () => {
 
         test('200 paginated for admin', async () => {
             svc.getAllUsers.mockResolvedValue([{ id: 'u1' }] as any);
-            const req = mockRequest({ user: { userId: 'u1', role: 'ADMIN' }, query: {} });
+            const req = mockRequest({ user: { userId: 'u1', role: 'ADMIN', instituteId: 'i1' }, query: {} });
             const res = mockResponse();
 
             await authController.getAllUsers(req, res);
 
             expect(statusCode(res)).toBe(200);
             expect(jsonBody(res).meta.pagination).toBeDefined();
+        });
+
+        // Step 12 release gate: the list is limited to the token's institute, and a query instituteId is ignored.
+        test('the user list is scoped to the token institute and ignores a query instituteId', async () => {
+            svc.getAllUsers.mockResolvedValue([] as any);
+            const req = mockRequest({
+                user: { userId: 'u1', role: 'ADMIN', instituteId: 'i1' },
+                query: { instituteId: 'i2' },
+            });
+            const res = mockResponse();
+
+            await authController.getAllUsers(req, res);
+
+            expect(svc.getAllUsers).toHaveBeenCalledWith(expect.objectContaining({ instituteId: 'i1' }));
+        });
+
+        test('403 for an admin token with no institute (fails closed, no query)', async () => {
+            const req = mockRequest({ user: { userId: 'u1', role: 'ADMIN', instituteId: '' }, query: {} });
+            const res = mockResponse();
+
+            await authController.getAllUsers(req, res);
+
+            expect(statusCode(res)).toBe(403);
+            expect(svc.getAllUsers).not.toHaveBeenCalled();
         });
     });
 });

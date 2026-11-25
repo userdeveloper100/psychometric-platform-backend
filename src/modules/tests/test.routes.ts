@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as testController from './test.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
+import { authorizeRoles } from '../../middleware/role.middleware';
 
 const router = Router();
 
@@ -49,7 +50,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post('/',authenticateJWT,  testController.createTest);
+router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.createTest);
 
 /**
  * @route   GET /api/tests?instituteId=...&page=1&limit=10&status=DRAFT|PUBLISHED&search=...
@@ -156,7 +157,7 @@ router.get('/', authenticateJWT, testController.getAllTests);
  *       500:
  *         description: Internal server error
  */
-router.patch('/:id/publish', authenticateJWT, testController.publishTest);
+router.patch('/:id/publish', authenticateJWT, authorizeRoles('ADMIN'), testController.publishTest);
 
 /**
  * @route   DELETE /api/tests/:id
@@ -188,6 +189,6 @@ router.patch('/:id/publish', authenticateJWT, testController.publishTest);
  *       500:
  *         description: Internal server error
  */
-router.delete('/:id', authenticateJWT, testController.deleteTest);
+router.delete('/:id', authenticateJWT, authorizeRoles('ADMIN'), testController.deleteTest);
 
 export default router;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as authController from './auth.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
+import { authorizeRoles } from '../../middleware/role.middleware';
 import { authRateLimiter } from '../../middleware/rateLimit.middleware';
 
 const router = Router();
@@ -347,6 +348,6 @@ router.post('/login', authRateLimiter, authController.login);
  *                   type: string
  *                   example: Failed to fetch users
  */
-router.get('/users', authenticateJWT, authController.getAllUsers);
+router.get('/users', authenticateJWT, authorizeRoles('ADMIN'), authController.getAllUsers);
 
 export default router;

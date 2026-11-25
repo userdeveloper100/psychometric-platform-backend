@@ -13,6 +13,7 @@ import {
     calculatePagination,
     serverErrorResponse
 } from '../../utils/response-helpers';
+import { logSecurityEvent } from '../../utils/security-logger';
 
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
@@ -46,6 +47,15 @@ export const inviteStudents = async (
             instituteId
         );
 
+        logSecurityEvent('sensitive_admin_action', {
+            userId,
+            instituteId,
+            role: user?.role,
+            action: 'create_invites',
+            resourceType: 'test',
+            resourceId: testId,
+        });
+
         return createdResponse(
             res,
             result,
@@ -53,6 +63,15 @@ export const inviteStudents = async (
         );
     } catch (error: any) {
         if (error.message.includes('not found')) {
+            logSecurityEvent('authorization_denied', {
+                userId: (req as any).user?.userId,
+                instituteId: (req as any).user?.instituteId,
+                role: (req as any).user?.role,
+                action: 'create_invites',
+                resourceType: 'test',
+                resourceId: req.params.testId,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         if (error.message.includes('access denied')) {
@@ -187,9 +206,27 @@ export const deleteInvite = async (
 
         const deleted = await inviteService.deleteInvite(id, userId, instituteId);
 
+        logSecurityEvent('sensitive_admin_action', {
+            userId,
+            instituteId,
+            role: user?.role,
+            action: 'revoke_invite',
+            resourceType: 'invite',
+            resourceId: id,
+        });
+
         return successResponse(res, deleted, 'Invite deleted successfully');
     } catch (error: any) {
         if (error.message.includes('not found')) {
+            logSecurityEvent('authorization_denied', {
+                userId: (req as any).user?.userId,
+                instituteId: (req as any).user?.instituteId,
+                role: (req as any).user?.role,
+                action: 'revoke_invite',
+                resourceType: 'invite',
+                resourceId: req.params.id,
+                reason: 'not_found_in_scope',
+            });
             return notFoundResponse(res, error.message);
         }
         if (error.message.includes('access denied')) {
