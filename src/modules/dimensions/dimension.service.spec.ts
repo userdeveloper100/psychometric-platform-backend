@@ -1,29 +1,32 @@
 import prisma from '../../config/prisma';
-import { cascadeSoftDelete } from '../../utils/softDelete';
 import { countDimensions, createDimension, deleteDimension, getAllDimensions, getTestDimensions } from './dimension.service';
 
-jest.mock('../../config/prisma', () => ({
-    __esModule: true,
-    default: {
+jest.mock('../../config/prisma', () => {
+    const client: any = {
         psychometricTest: { findFirst: jest.fn() },
         dimension: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
+            update: jest.fn(),
+            updateMany: jest.fn(),
         },
-    },
-}));
-jest.mock('../../utils/softDelete', () => ({
-    cascadeSoftDelete: jest.fn().mockResolvedValue({}),
-}));
+        question: { updateMany: jest.fn() },
+        response: { updateMany: jest.fn() },
+    };
+    client.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) => fn(client));
+    return { __esModule: true, default: client };
+});
 jest.mock('../../utils/cache', () => ({
     withCache: jest.fn((_key: string, load: () => Promise<unknown>) => load()),
     cacheDelete: jest.fn().mockResolvedValue(undefined),
 }));
 
 const testMock = prisma.psychometricTest as unknown as { findFirst: jest.Mock };
-const dimMock = prisma.dimension as unknown as Record<'findFirst' | 'findMany' | 'count' | 'create', jest.Mock>;
+const dimMock = prisma.dimension as unknown as Record<'findFirst' | 'findMany' | 'count' | 'create' | 'update', jest.Mock>;
+const questionMock = prisma.question as unknown as { updateMany: jest.Mock };
+const responseMock = prisma.response as unknown as { updateMany: jest.Mock };
 
 const OWN = 'institute-a';
 const OTHER = 'institute-b';
@@ -107,19 +110,33 @@ describe('dimension.service tenant scope (SEC-06)', () => {
             expect(dimMock.findFirst).toHaveBeenCalledWith({
                 where: { id: 'dim-b', isActive: true, ...scope(OWN) },
             });
-            expect(cascadeSoftDelete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+            expect(dimMock.update).not.toHaveBeenCalled();
         });
 
-        test('an own dimension is soft deleted through the cascade after the scoped lookup', async () => {
+        test('an own dimension cascades in one transaction: responses, then questions, then the dimension', async () => {
             dimMock.findFirst.mockResolvedValue({ id: 'dim-a', testId: 'test-a' });
             await deleteDimension('dim-a', 'u1', OWN);
-            expect(cascadeSoftDelete).toHaveBeenCalledWith('dimension', 'dim-a', ['question'], 'u1');
+
+            expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+            expect(responseMock.updateMany).toHaveBeenCalledWith({
+                where: { isActive: true, question: { dimensionId: 'dim-a' } },
+                data: expect.objectContaining({ isActive: false, updatedBy: 'u1' }),
+            });
+            expect(questionMock.updateMany).toHaveBeenCalledWith({
+                where: { isActive: true, dimensionId: 'dim-a' },
+                data: expect.objectContaining({ isActive: false, updatedBy: 'u1' }),
+            });
+            expect(dimMock.update).toHaveBeenCalledWith({
+                where: { id: 'dim-a' },
+                data: expect.objectContaining({ isActive: false, updatedBy: 'u1' }),
+            });
         });
 
         test('fail closed without an institute and nothing is deleted', async () => {
             await expect(deleteDimension('dim-a', 'u1', '')).rejects.toThrow('Institute scope is required');
             expect(dimMock.findFirst).not.toHaveBeenCalled();
-            expect(cascadeSoftDelete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
     });
 });

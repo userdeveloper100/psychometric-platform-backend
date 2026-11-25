@@ -1,25 +1,26 @@
 import prisma from '../../config/prisma';
-import { cascadeSoftDelete } from '../../utils/softDelete';
 import { publishTest, deleteTest, UserRole } from './test.service';
 
-jest.mock('../../config/prisma', () => ({
-    __esModule: true,
-    default: {
-        psychometricTest: {
-            findFirst: jest.fn(),
-            update: jest.fn(),
-        },
-    },
-}));
-jest.mock('../../utils/softDelete', () => ({
-    cascadeSoftDelete: jest.fn().mockResolvedValue({}),
-}));
+jest.mock('../../config/prisma', () => {
+    const models = () => ({ updateMany: jest.fn(), update: jest.fn() });
+    const client: any = {
+        psychometricTest: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+        dimension: models(),
+        question: models(),
+        testInvite: models(),
+        response: models(),
+    };
+    client.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) => fn(client));
+    return { __esModule: true, default: client };
+});
 
 const findFirst = prisma.psychometricTest.findFirst as unknown as jest.Mock;
 const update = prisma.psychometricTest.update as unknown as jest.Mock;
+const model = (name: 'dimension' | 'question' | 'testInvite' | 'response') =>
+    prisma[name] as unknown as { updateMany: jest.Mock };
 
-const admin = { role: UserRole.ADMIN, instituteId: 'institute-a' };
-const student = { role: UserRole.STUDENT, instituteId: 'institute-a' };
+const admin = { userId: 'user-a', role: UserRole.ADMIN, instituteId: 'institute-a' };
+const student = { userId: 'user-s', role: UserRole.STUDENT, instituteId: 'institute-a' };
 
 describe('test.service publishTest (SEC-01)', () => {
     test('looks the test up scoped to the requesting institute', async () => {
@@ -80,20 +81,48 @@ describe('test.service deleteTest (SEC-01)', () => {
         });
     });
 
-    test('deletes the institute own test and cascades', async () => {
+    test('deletes the institute own test and cascades in one transaction, with updatedBy set to the user', async () => {
         findFirst.mockResolvedValue({ id: 't1', instituteId: 'institute-a' });
 
         const result = await deleteTest({ testId: 't1', requestedBy: admin });
 
         expect(result).toEqual({ success: true });
-        expect(cascadeSoftDelete).toHaveBeenCalledWith('psychometricTest', 't1', ['dimension', 'testInvite'], 'institute-a');
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(model('response').updateMany).toHaveBeenCalledWith({
+            where: { isActive: true, question: { dimension: { testId: 't1' } } },
+            data: expect.objectContaining({ isActive: false, updatedBy: 'user-a' }),
+        });
+        expect(model('question').updateMany).toHaveBeenCalledWith({
+            where: { isActive: true, dimension: { testId: 't1' } },
+            data: expect.objectContaining({ isActive: false, updatedBy: 'user-a' }),
+        });
+        expect(model('testInvite').updateMany).toHaveBeenCalledWith({
+            where: { isActive: true, testId: 't1' },
+            data: expect.objectContaining({ isActive: false, updatedBy: 'user-a' }),
+        });
+        expect(model('dimension').updateMany).toHaveBeenCalledWith({
+            where: { isActive: true, testId: 't1' },
+            data: expect.objectContaining({ isActive: false, updatedBy: 'user-a' }),
+        });
+        expect(update).toHaveBeenCalledWith({
+            where: { id: 't1' },
+            data: expect.objectContaining({ isActive: false, updatedBy: 'user-a' }),
+        });
+    });
+
+    test('updatedBy never holds the institute id', async () => {
+        findFirst.mockResolvedValue({ id: 't1', instituteId: 'institute-a' });
+        await deleteTest({ testId: 't1', requestedBy: admin });
+        expect(update.mock.calls[0][0].data.updatedBy).not.toBe('institute-a');
+        expect(model('dimension').updateMany.mock.calls[0][0].data.updatedBy).not.toBe('institute-a');
     });
 
     test('another institute test is reported as "Test not found" and nothing is deleted', async () => {
         findFirst.mockResolvedValue(null);
 
         await expect(deleteTest({ testId: 'test-of-b', requestedBy: admin })).rejects.toThrow('Test not found');
-        expect(cascadeSoftDelete).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(update).not.toHaveBeenCalled();
     });
 
     test('a STUDENT is rejected before any lookup', async () => {

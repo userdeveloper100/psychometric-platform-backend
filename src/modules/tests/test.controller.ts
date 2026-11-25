@@ -152,6 +152,7 @@ export const publishTest = async (req: Request, res: Response): Promise<Response
         const test = await testService.publishTest({
             testId,
             requestedBy: {
+                userId: user.userId,
                 role: user.role,
                 instituteId: user.instituteId
             }
@@ -188,6 +189,7 @@ export const deleteTest = async (req: Request, res: Response): Promise<Response>
         const test = await testService.deleteTest({
             testId,
             requestedBy: {
+                userId: user.userId,
                 role: user.role,
                 instituteId: user.instituteId
             }

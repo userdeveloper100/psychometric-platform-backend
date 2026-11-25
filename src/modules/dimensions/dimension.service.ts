@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
-import { cascadeSoftDelete } from '../../utils/softDelete';
+import { softDeleteAudit } from '../../utils/softDelete';
 import { withCache, cacheDelete } from '../../utils/cache';
 
 // Test structures change rarely — good cache candidates (5 min TTL via withCache).
@@ -135,7 +135,25 @@ export async function deleteDimension(dimensionId: string, userId: string, insti
             throw new Error('Dimension not found');
         }
 
-        await cascadeSoftDelete('dimension', dimensionId, ['question'], userId);
+        // DB-01: one transaction. Responses of the dimension's questions are included, which the old cascade missed.
+        await prisma.$transaction(async (tx) => {
+            const audit = softDeleteAudit(userId);
+
+            await tx.response.updateMany({
+                where: { isActive: true, question: { dimensionId } },
+                data: audit
+            });
+
+            await tx.question.updateMany({
+                where: { isActive: true, dimensionId },
+                data: audit
+            });
+
+            await tx.dimension.update({
+                where: { id: dimensionId },
+                data: audit
+            });
+        });
 
         // Invalidate the cached dimension list for the parent test.
         await cacheDelete(testDimensionsCacheKey(dimension.testId));

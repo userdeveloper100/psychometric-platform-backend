@@ -1,5 +1,4 @@
 import prisma from '../../config/prisma';
-import { cascadeSoftDelete } from '../../utils/softDelete';
 import {
     countQuestions,
     createQuestion,
@@ -8,24 +7,25 @@ import {
     getDimensionQuestions,
 } from './question.service';
 
-jest.mock('../../config/prisma', () => ({
-    __esModule: true,
-    default: {
+jest.mock('../../config/prisma', () => {
+    const client: any = {
         dimension: { findFirst: jest.fn() },
         question: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
+            update: jest.fn(),
         },
-    },
-}));
-jest.mock('../../utils/softDelete', () => ({
-    cascadeSoftDelete: jest.fn().mockResolvedValue({}),
-}));
+        response: { updateMany: jest.fn() },
+    };
+    client.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) => fn(client));
+    return { __esModule: true, default: client };
+});
 
 const dimMock = prisma.dimension as unknown as { findFirst: jest.Mock };
-const qMock = prisma.question as unknown as Record<'findFirst' | 'findMany' | 'count' | 'create', jest.Mock>;
+const qMock = prisma.question as unknown as Record<'findFirst' | 'findMany' | 'count' | 'create' | 'update', jest.Mock>;
+const responseMock = prisma.response as unknown as { updateMany: jest.Mock };
 
 const OWN = 'institute-a';
 const OTHER = 'institute-b';
@@ -121,19 +121,29 @@ describe('question.service tenant scope (SEC-06)', () => {
             qMock.findFirst.mockResolvedValue(null);
             await expect(deleteQuestion('q-b', 'u1', OWN)).rejects.toThrow('Question not found');
             expect(qMock.findFirst).toHaveBeenCalledWith({ where: { id: 'q-b', ...chain(OWN) } });
-            expect(cascadeSoftDelete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
+            expect(qMock.update).not.toHaveBeenCalled();
         });
 
-        test('an own question is soft deleted through the cascade after the scoped lookup', async () => {
+        test('an own question cascades in one transaction: responses first, then the question, with updatedBy set to the user', async () => {
             qMock.findFirst.mockResolvedValue({ id: 'q-a' });
             await deleteQuestion('q-a', 'u1', OWN);
-            expect(cascadeSoftDelete).toHaveBeenCalledWith('question', 'q-a', ['response'], 'u1');
+
+            expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+            expect(responseMock.updateMany).toHaveBeenCalledWith({
+                where: { isActive: true, questionId: 'q-a' },
+                data: expect.objectContaining({ isActive: false, updatedBy: 'u1' }),
+            });
+            expect(qMock.update).toHaveBeenCalledWith({
+                where: { id: 'q-a' },
+                data: expect.objectContaining({ isActive: false, updatedBy: 'u1' }),
+            });
         });
 
         test('fail closed without an institute and nothing is deleted', async () => {
             await expect(deleteQuestion('q-a', 'u1', '')).rejects.toThrow('Institute scope is required');
             expect(qMock.findFirst).not.toHaveBeenCalled();
-            expect(cascadeSoftDelete).not.toHaveBeenCalled();
+            expect(prisma.$transaction).not.toHaveBeenCalled();
         });
 
         test('a different institute id does not match an own question', async () => {

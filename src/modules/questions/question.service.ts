@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
-import { cascadeSoftDelete } from '../../utils/softDelete';
+import { softDeleteAudit } from '../../utils/softDelete';
 
 interface CreateQuestionInput {
     text: string;
@@ -137,7 +137,20 @@ export async function deleteQuestion(questionId: string, userId: string, institu
             throw new Error('Question not found');
         }
 
-        await cascadeSoftDelete('question', questionId, ['response'], userId);
+        // DB-01: one transaction. The question's responses are soft deleted with it.
+        await prisma.$transaction(async (tx) => {
+            const audit = softDeleteAudit(userId);
+
+            await tx.response.updateMany({
+                where: { isActive: true, questionId },
+                data: audit
+            });
+
+            await tx.question.update({
+                where: { id: questionId },
+                data: audit
+            });
+        });
 
         return { success: true };
     } catch (error) {

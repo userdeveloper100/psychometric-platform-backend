@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
-import { cascadeSoftDelete } from '../../utils/softDelete';
+import { softDeleteAudit } from '../../utils/softDelete';
 
 interface CreateInstituteInput {
     name: string;
@@ -216,7 +216,65 @@ export async function deleteInstitute(id: string, userId: string, requestingInst
         throw new Error('Institute not found');
     }
 
-    await cascadeSoftDelete('institute', id, ['user', 'student', 'psychometricTest'], userId);
+    // DB-01: one transaction. Each child is found through its real relation to the institute, and the
+    // institute is updated last. Children are matched by relation, not by parent isActive, so the filters
+    // still match after the parents are deactivated.
+    await prisma.$transaction(async (tx) => {
+        const audit = softDeleteAudit(userId);
+
+        await tx.response.updateMany({
+            where: {
+                isActive: true,
+                OR: [
+                    { student: { instituteId: id } },
+                    { question: { dimension: { test: { instituteId: id } } } }
+                ]
+            },
+            data: audit
+        });
+
+        await tx.testInvite.updateMany({
+            where: {
+                isActive: true,
+                OR: [
+                    { test: { instituteId: id } },
+                    { student: { instituteId: id } }
+                ]
+            },
+            data: audit
+        });
+
+        await tx.question.updateMany({
+            where: { isActive: true, dimension: { test: { instituteId: id } } },
+            data: audit
+        });
+
+        await tx.dimension.updateMany({
+            where: { isActive: true, test: { instituteId: id } },
+            data: audit
+        });
+
+        await tx.student.updateMany({
+            where: { isActive: true, instituteId: id },
+            data: audit
+        });
+
+        await tx.psychometricTest.updateMany({
+            where: { isActive: true, instituteId: id },
+            data: audit
+        });
+
+        // Users of the institute are deactivated, as the previous cascade did.
+        await tx.user.updateMany({
+            where: { isActive: true, instituteId: id },
+            data: audit
+        });
+
+        await tx.institute.update({
+            where: { id },
+            data: audit
+        });
+    });
 
     return { success: true };
 }

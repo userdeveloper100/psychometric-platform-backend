@@ -847,6 +847,7 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | `SEC-02` Role & Tenant Authorization on Institute Endpoints | Reusable `authorizeRoles` middleware (401 with no user, 403 for the wrong role). All five institute routes require ADMIN. An ADMIN can view, update or delete only their own institute; a foreign institute returns 404 before any cascade runs. Listing is scoped to the requester's institute. Spoofed `instituteId` values in query or body are ignored | `security: protect institute endpoints with role authorization` |
 | `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
 | `SEC-03` Response Tenant Isolation & Role Authorization | Response list, student read, test read and delete require ADMIN (STUDENT gets 403). Every read and delete is scoped through student and test to the requester's institute; a foreign student, test or response returns 404 with no data; a missing institute fails closed. Student submission is unchanged | `security: enforce response tenant isolation` |
+| `DB-01` Soft-Delete Cascade Relationships | Each soft-delete cascade (Institute, Test, Dimension, Question, Student) runs in one `prisma.$transaction`, with children matched by their real foreign keys. The old generic cascade had wrong lookups (for example institute → `testId`, invite → `studentId`) and returned 500 for an own-institute delete. `updatedBy` now records the acting user (test delete recorded the institute id). Dimension delete now also soft deletes the responses of its questions. Users of a deleted institute are deactivated, as before. Rows are never removed | `fix: correct soft delete cascade relationships` |
 | `SEC-10` Tenant-Scoped Reporting & Report Parameter Fix | Fixed the report handlers that read `req.params.id` while the routes define `:testId` and `:studentId` (every valid report returned 400). The student report route has its own handler and returns one student. All report routes are ADMIN-only (STUDENT 403, no token 401). Test, student and list reports are scoped to the caller's institute; a foreign or non-existent test or student returns 404. Inactive students, tests, dimensions, questions and responses are excluded. Student self-service reports are not offered until DEC-03 is decided. **All P0 security items are now complete:** SEC-07, SEC-01, SEC-02, SEC-03, SEC-05, SEC-06 and SEC-10 | `security: enforce tenant scoped reporting` |
 | `SEC-06` Dimension & Question Ownership | Dimension and question writes (create and delete) require ADMIN (STUDENT gets 403). Each write checks the full chain (question → dimension → test → institute, all active) before any write or cascade; a foreign or inactive parent returns 404 and the other institute's rows are untouched. Global lists are scoped to the institute. Reads stay available to any user of the same institute (documented in `docs/INTEGRATION_TESTING.md`). No update routes exist for these entities | `security: validate dimension and question ownership` |
 | `SEC-05` Invite Token Protection & Access | Invite listings and reads never return a token; a token is returned once, to the admin who creates the invite. All invite routes require ADMIN (STUDENT gets 403) and are scoped to the requester's institute (foreign invite or student returns 404). Tokens use `randomBytes(32)`. Submission refuses expired invites. Unknown, revoked, expired and used tokens are refused without echoing the token. **Not done:** tokens are still stored in plaintext; hashing at rest needs a migration and a decision on existing invites | `security: protect invite tokens and access` |
@@ -855,7 +856,6 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Task | Scope |
 |---|---|
-| `DB-01` | Fix soft-delete cascade lookup relationships. Also blocks an ADMIN deleting their own institute, which currently returns 500 (a pending test covers it) |
 | `DB-02` | Allow valid student re-invitations after soft delete |
 | `DB-03` | Enforce assessment response question and student integrity |
 | `DEC-01` | Platform model decision (institute and student platform, or recruiting SaaS) |
@@ -869,9 +869,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 24 of 24 suites, **269 of 269 tests passed** |
-| Integration (active) | `npm run test:integration` | 8 of 8 suites, **152 of 152 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **1 of 1 failing, as designed**: the `DB-01` cascade defect (own-institute delete returns 500) |
+| Unit | `npm test` | 25 of 25 suites, **274 of 274 tests passed** |
+| Integration (active) | `npm run test:integration` | 9 of 9 suites, **170 of 170 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02 and DB-03 have no pending tests yet |
 
 ---
 

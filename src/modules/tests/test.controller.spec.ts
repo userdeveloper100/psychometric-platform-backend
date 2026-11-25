@@ -17,7 +17,7 @@ jest.mock('../../config/prisma', () => ({
 }));
 
 const svc = testService as jest.Mocked<typeof testService>;
-const adminUser = { role: 'ADMIN', instituteId: 'i1' };
+const adminUser = { userId: 'u1', role: 'ADMIN', instituteId: 'i1' };
 const meta = { total: 9, totalPages: 1, hasNextPage: false, hasPreviousPage: false };
 
 describe('test.controller', () => {
@@ -149,7 +149,7 @@ describe('test.controller', () => {
 
             expect(svc.publishTest).toHaveBeenCalledWith({
                 testId: 't1',
-                requestedBy: { role: 'ADMIN', instituteId: 'i1' },
+                requestedBy: { userId: 'u1', role: 'ADMIN', instituteId: 'i1' },
             });
             expect(statusCode(res)).toBe(200);
         });
@@ -193,7 +193,7 @@ describe('test.controller', () => {
 
             expect(svc.deleteTest).toHaveBeenCalledWith({
                 testId: 't1',
-                requestedBy: { role: 'ADMIN', instituteId: 'i1' },
+                requestedBy: { userId: 'u1', role: 'ADMIN', instituteId: 'i1' },
             });
             expect(statusCode(res)).toBe(200);
         });

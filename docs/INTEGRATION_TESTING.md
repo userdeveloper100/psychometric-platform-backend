@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-24 (SEC-10):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10) are promoted to active suites. The only remaining pending test is the DB-01 cascade defect, which fails against the current code on purpose.
+**Status as of 2026-11-25 (DB-01):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10) and the soft-delete cascade defect (DB-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -12,7 +12,7 @@ Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEME
 |---|---|---|---|---|
 | Unit tests | `jest.config.ts` | `src/**/*.spec.ts` (not `src/integration/`) | No | `npm test` |
 | Integration tests (pass today) | `jest.integration.config.ts` | `src/integration/*.integration.spec.ts` | Yes, test database | `npm run test:integration` |
-| Pending security regressions | `jest.security-pending.config.ts` | `src/integration/*.pending.integration.spec.ts` | Yes, test database | `npm run test:integration:pending` |
+| Pending security regressions (none at present) | `jest.security-pending.config.ts` | `src/integration/*.pending.integration.spec.ts` | Yes, test database | `npm run test:integration:pending` |
 | Database setup | `scripts/integration-db-setup.ts` | n/a | Yes, applies migrations | `npm run test:db:setup` |
 
 Shared helpers live in `src/test-utils/integration/`:
@@ -103,9 +103,9 @@ Expected last lines: `Database schema is up to date!` followed by `[integration-
 | Goal | Command |
 |---|---|
 | Build (type check of production code) | `npm run build` |
-| Unit tests (269 tests, 24 suites, no database) | `npm test` |
+| Unit tests (274 tests, 25 suites, no database) | `npm test` |
 | Integration tests (pass today) | `npm run test:integration` |
-| Pending security regressions (expected to fail today) | `npm run test:integration:pending` |
+| Pending security regressions (none at present; the script passes with no tests) | `npm run test:integration:pending` |
 | Apply migrations to the test database | `npm run test:db:setup` |
 | Migration status, test database | `DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate status` |
 | Migration status, development database (read only) | `npx prisma migrate status` (reads `.env`) |
@@ -158,21 +158,21 @@ Run on 2026-11-24 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 24 suites) | 24 of 24 suites, **269 of 269 tests passed** |
-| `npm run test:integration` | 8 of 8 suites, **152 of 152 tests passed** |
-| `npm run test:integration:pending` | **1 of 1 failed, as designed** (DB-01, see section 8) |
+| `npm test` (unit, 25 suites) | 25 of 25 suites, **274 of 274 tests passed** |
+| `npm run test:integration` | 9 of 9 suites, **170 of 170 tests passed** |
+| `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (152)
+### 7.1 Passing integration tests (170)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
 **`test-security.integration.spec.ts` (14):** SEC-01 regression tests, promoted from the pending suite once fixed. Publish and delete are scoped to the caller's institute. A spoofed `instituteId` in the body is ignored. A foreign and a non-existent test return the same 404. STUDENT gets 403 and no token gets 401.
 
-**`institute-security.integration.spec.ts` (16):** SEC-02 regression tests, promoted from the pending suite once fixed. Every institute route requires the ADMIN role (STUDENT gets 403). An ADMIN can act only on their own institute: a foreign institute returns 404 with no data returned and no cascade run. A foreign and a non-existent institute get the same response. A spoofed `instituteId` in the body or query does not widen scope. Unauthenticated requests get 401. Own-institute DELETE is not asserted here (see the DB-01 pending entry in section 8).
+**`institute-security.integration.spec.ts` (16):** SEC-02 regression tests, promoted from the pending suite once fixed. Every institute route requires the ADMIN role (STUDENT gets 403). An ADMIN can act only on their own institute: a foreign institute returns 404 with no data returned and no cascade run. A foreign and a non-existent institute get the same response. A spoofed `instituteId` in the body or query does not widen scope. Unauthenticated requests get 401. Own-institute DELETE is not asserted here. It is covered in soft-delete-cascade.integration.spec.ts (DB-01).
 
 **`response-security.integration.spec.ts` (20):** SEC-03 regression tests, promoted from the pending suite once fixed. The list, the student read, the test read and the delete are ADMIN-only (STUDENT gets 403, no token gets 401). An ADMIN sees and deletes only responses whose student and test both belong to their institute. A student or test of another institute returns 404 and no response data. A foreign and a non-existent response get the same response. A query or body `instituteId` does not widen scope. A token with an empty `instituteId` fails closed (403 on list, 404 on lookups, no rows touched). The student submission flow (`POST /responses/submit`) still returns 201 for the student's own invite.
 
@@ -183,6 +183,8 @@ Run on 2026-11-24 against `psychometric_test`:
 **`report-security.integration.spec.ts` (21):** SEC-10 regression tests, promoted from the pending suite once fixed, together with the report-parameter functional test. Every report route requires ADMIN: STUDENT gets 403, no token gets 401. The handlers read `:testId` and `:studentId` from the route, so valid requests return 200. The student report route returns one student, not the whole test. An ADMIN of A gets accurate scores from active responses (answer 3 gives score 3). A foreign or non-existent test or student returns the same 404. Inactive students, tests, dimensions, questions and responses are left out: an inactive student or test gets 404 on the single report, an inactive test drops out of the list, and a deactivated response or question does not count toward the score. Query and body `instituteId` values are ignored. A token without an institute fails closed with 403.
 
 **Report access policy.** All report routes are ADMIN-only. Student self-service reports are not offered, because `Student` is not linked to `User` (DEC-03 is still open), so a STUDENT token cannot be matched to a student record. Revisit this when DEC-03 is decided.
+
+**`soft-delete-cascade.integration.spec.ts` (18):** DB-01 regression tests, including the own-institute delete that was previously pending. Deleting an own institute returns 200 and soft deletes every dependent row: tests, dimensions, questions, students, invites, responses and users. Each of these has `updatedBy` set to the acting user, never the institute id. Deleting an own test cascades to its dimensions, questions, invites and responses, and leaves the institute and the student active. Deleting an own dimension cascades to its questions and their responses. Deleting an own question cascades to its responses. Deleting an own student cascades to its invites and responses. Cross-tenant deletes return 404 and leave institute B untouched. Deleting the same test twice returns 404 and keeps the first `updatedBy`. No row is ever removed; each cascade sets `isActive` to false.
 
 **Read policy for dimensions and questions.** Reads are not restricted to ADMIN. Any authenticated user may read the dimensions and questions of their own institute. A STUDENT of institute A can read an A test's dimensions (200), and a foreign test or dimension returns 404. The reason is that a STUDENT is not yet linked to a test (DEC-03), so an ADMIN-only read would remove the only read path students have. Writes stay ADMIN-only. There are no update (PUT) routes for dimensions or questions, so the update case in the brief has no route to test. None was added.
 
@@ -209,9 +211,20 @@ Run them with `npm run test:integration:pending`.
 
 | Audit ID | Scenario | Observed today | Status |
 |---|---|---|---|
-| DB-01 | Admin of A soft deletes their own institute | **500** (cascade lookup defect) | Pending until DB-01 is fixed |
+No pending tests remain. Every item from the original pending list has been fixed and promoted to an active suite:
 
-Counting: 1 pending test in total: the DB-01 cascade defect that blocks the own-institute delete. SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07 and SEC-10 were fixed and promoted to active suites (`test-security.integration.spec.ts`, `institute-security.integration.spec.ts`, `response-security.integration.spec.ts`, `invite-security.integration.spec.ts`, `assessment-structure-security.integration.spec.ts`, `report-security.integration.spec.ts`, `guards.integration.spec.ts`, `src/config/env.process.spec.ts`).
+| Audit ID | Promoted to |
+|---|---|
+| SEC-01 | `test-security.integration.spec.ts` |
+| SEC-02 | `institute-security.integration.spec.ts` |
+| SEC-03 | `response-security.integration.spec.ts` |
+| SEC-05 | `invite-security.integration.spec.ts` |
+| SEC-06 | `assessment-structure-security.integration.spec.ts` |
+| SEC-07 | `guards.integration.spec.ts`, `src/config/env.process.spec.ts` |
+| SEC-10 and the report-parameter defect | `report-security.integration.spec.ts` |
+| DB-01 (own-institute delete, and the cascades) | `soft-delete-cascade.integration.spec.ts` |
+
+`security.pending.integration.spec.ts` was deleted once its last test was promoted. The `test:integration:pending` script is kept, with `--passWithNoTests`, so it exits 0 while there are no pending tests. Jest exits 1 on "No tests found" without that flag. The pending config and its `testMatch` stay in place for the next pending regression. DB-02 and DB-03 have no pending tests yet.
 
 ### 8.1 Report parameter defect (fixed under SEC-10)
 
@@ -219,7 +232,8 @@ Previously `report.controller.ts` read `req.params.id` while the routes define `
 
 ### 8.2 Items that need attention beyond the audit
 
-- **Institute deletion returns 500 for the owning admin.** A foreign admin gets 404 (SEC-02). The owning admin's delete reaches the cascade helper, which fails with a Prisma invocation error (DB-01). This is the one remaining pending test.
+- **Institute deletion (DB-01, fixed).** The owning admin's delete used to return 500. The cause was the generic cascade helper, which looked children up through a field-name map with wrong entries: `psychometricTest` and `student` were matched by `testId` and `studentId` instead of `instituteId`, `testInvite` by `studentId` instead of `testId`, and `response` by `questionId` instead of `studentId`. The helper is removed. Each service now writes its cascade explicitly, inside `prisma.$transaction`, using real foreign keys.
+- **Users are deactivated with their institute.** This keeps the previous cascade's behaviour. A deleted institute's users cannot use the app. Existing JWTs are not revoked, because JWT verification does not check the database.
 
 ---
 

@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
-import { cascadeSoftDelete } from '../../utils/softDelete';
+import { softDeleteAudit } from '../../utils/softDelete';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ interface GetAllTestsOptions {
 interface TestActionInput {
     testId: string;
     requestedBy: {
+        userId: string;
         role: UserRole;
         instituteId: string;
     };
@@ -248,8 +249,36 @@ export async function deleteTest({ testId, requestedBy }: TestActionInput) {
             throw new Error('Test not found');
         }
 
-        // Cascade delete to dimensions and test invites
-        await cascadeSoftDelete('psychometricTest', testId, ['dimension', 'testInvite'], requestedBy.instituteId);
+        // DB-01: one transaction. Children are found through their real parent relation to this test, and
+        // updatedBy records the acting user (it previously recorded the institute id).
+        await prisma.$transaction(async (tx) => {
+            const audit = softDeleteAudit(requestedBy.userId);
+
+            await tx.response.updateMany({
+                where: { isActive: true, question: { dimension: { testId } } },
+                data: audit
+            });
+
+            await tx.question.updateMany({
+                where: { isActive: true, dimension: { testId } },
+                data: audit
+            });
+
+            await tx.testInvite.updateMany({
+                where: { isActive: true, testId },
+                data: audit
+            });
+
+            await tx.dimension.updateMany({
+                where: { isActive: true, testId },
+                data: audit
+            });
+
+            await tx.psychometricTest.update({
+                where: { id: testId },
+                data: audit
+            });
+        });
 
         return { success: true };
     } catch (error) {

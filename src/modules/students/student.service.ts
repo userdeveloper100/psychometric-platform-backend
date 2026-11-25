@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
-import { cascadeSoftDelete } from '../../utils/softDelete';
+import { softDeleteAudit } from '../../utils/softDelete';
 import logger from '../../config/logger';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -218,8 +218,25 @@ export async function deleteStudent(
             throw new Error('Student not found');
         }
 
-        // Cascade delete to invites and responses
-        await cascadeSoftDelete('student', studentId, ['testInvite', 'response'], userId);
+        // DB-01: one transaction. Responses are matched by studentId. The previous cascade matched them by questionId.
+        await prisma.$transaction(async (tx) => {
+            const audit = softDeleteAudit(userId);
+
+            await tx.response.updateMany({
+                where: { isActive: true, studentId },
+                data: audit
+            });
+
+            await tx.testInvite.updateMany({
+                where: { isActive: true, studentId },
+                data: audit
+            });
+
+            await tx.student.update({
+                where: { id: studentId },
+                data: audit
+            });
+        });
 
         logger.info('Student soft deleted', { studentId });
         return { success: true };
