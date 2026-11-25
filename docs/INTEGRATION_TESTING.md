@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-25 (DB-01):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10) and the soft-delete cascade defect (DB-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
+**Status as of 2026-11-25 (DB-02):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01) and student re-invitation (DB-02) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -103,7 +103,7 @@ Expected last lines: `Database schema is up to date!` followed by `[integration-
 | Goal | Command |
 |---|---|
 | Build (type check of production code) | `npm run build` |
-| Unit tests (274 tests, 25 suites, no database) | `npm test` |
+| Unit tests (283 tests, 25 suites, no database) | `npm test` |
 | Integration tests (pass today) | `npm run test:integration` |
 | Pending security regressions (none at present; the script passes with no tests) | `npm run test:integration:pending` |
 | Apply migrations to the test database | `npm run test:db:setup` |
@@ -158,15 +158,15 @@ Run on 2026-11-24 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 25 suites) | 25 of 25 suites, **274 of 274 tests passed** |
-| `npm run test:integration` | 9 of 9 suites, **170 of 170 tests passed** |
+| `npm test` (unit, 25 suites) | 25 of 25 suites, **283 of 283 tests passed** |
+| `npm run test:integration` | 10 of 10 suites, **183 of 183 tests passed** |
 | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (170)
+### 7.1 Passing integration tests (183)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -185,6 +185,8 @@ Run on 2026-11-24 against `psychometric_test`:
 **Report access policy.** All report routes are ADMIN-only. Student self-service reports are not offered, because `Student` is not linked to `User` (DEC-03 is still open), so a STUDENT token cannot be matched to a student record. Revisit this when DEC-03 is decided.
 
 **`soft-delete-cascade.integration.spec.ts` (18):** DB-01 regression tests, including the own-institute delete that was previously pending. Deleting an own institute returns 200 and soft deletes every dependent row: tests, dimensions, questions, students, invites, responses and users. Each of these has `updatedBy` set to the acting user, never the institute id. Deleting an own test cascades to its dimensions, questions, invites and responses, and leaves the institute and the student active. Deleting an own dimension cascades to its questions and their responses. Deleting an own question cascades to its responses. Deleting an own student cascades to its invites and responses. Cross-tenant deletes return 404 and leave institute B untouched. Deleting the same test twice returns 404 and keeps the first `updatedBy`. No row is ever removed; each cascade sets `isActive` to false.
+
+**`invite-reinvitation.integration.spec.ts` (13):** DB-02 regression tests. A revoked invite is re-issued with a new token on the same row (`testId, studentId` is unique in the schema, so a second row cannot be inserted). The new token submits (201), and the old token is refused (400). An expired invite is re-issued the same way. A duplicate active, unexpired invite is skipped and its token is unchanged. A completed invite is never re-issued, active or revoked. A soft-deleted student's old id gets 404. Deleting a student and re-creating them with the same email, then inviting the new record, works end to end. Re-invite is tenant scoped: a foreign student or a foreign test gets 404 with no row written, and a foreign and a missing student get the same response.
 
 **Read policy for dimensions and questions.** Reads are not restricted to ADMIN. Any authenticated user may read the dimensions and questions of their own institute. A STUDENT of institute A can read an A test's dimensions (200), and a foreign test or dimension returns 404. The reason is that a STUDENT is not yet linked to a test (DEC-03), so an ADMIN-only read would remove the only read path students have. Writes stay ADMIN-only. There are no update (PUT) routes for dimensions or questions, so the update case in the brief has no route to test. None was added.
 
@@ -231,6 +233,8 @@ No pending tests remain. Every item from the original pending list has been fixe
 Previously `report.controller.ts` read `req.params.id` while the routes define `:testId` and `:studentId`, so every valid report request returned 400. The student report route also called the test-report handler and so could not return one student. Both are fixed: the handlers read the route parameters, and the student route has its own handler. The regression tests are in `report-security.integration.spec.ts`.
 
 ### 8.2 Items that need attention beyond the audit
+
+- **Student re-invitation (DB-02, fixed).** Two blockers. First, `TestInvite` has `@@unique([testId, studentId])`, and the invite service only looked at active rows, so re-inviting after a revoke or expiry hit a unique-constraint error (returned as 400). The fix reuses the existing row with a new token, instead of inserting a second one, and it skips completed and duplicate active invites. No migration was needed. Second, `POST /api/students/AddStudent` required a body `instituteId` that the server never used, so a student could not be re-created. That rule is removed. A soft-deleted student is not restored by id. Re-create the student with the same email instead.
 
 - **Institute deletion (DB-01, fixed).** The owning admin's delete used to return 500. The cause was the generic cascade helper, which looked children up through a field-name map with wrong entries: `psychometricTest` and `student` were matched by `testId` and `studentId` instead of `instituteId`, `testInvite` by `studentId` instead of `testId`, and `response` by `questionId` instead of `studentId`. The helper is removed. Each service now writes its cascade explicitly, inside `prisma.$transaction`, using real foreign keys.
 - **Users are deactivated with their institute.** This keeps the previous cascade's behaviour. A deleted institute's users cannot use the app. Existing JWTs are not revoked, because JWT verification does not check the database.

@@ -13,9 +13,6 @@ export const createStudentValidation = [
         .isEmail()
         .withMessage("Invalid email"),
 
-    body("instituteId")
-        .notEmpty()
-        .withMessage("Institute ID is required")
-        .isUUID()
-        .withMessage("Invalid instituteId format"),
+    // instituteId is not validated here. The tenant comes only from the verified JWT (req.user), so a body value
+    // would be ignored anyway. Requiring it made a student impossible to create without a value the server never uses.
 ];

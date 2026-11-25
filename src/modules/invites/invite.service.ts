@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { InviteStatus, Prisma } from '@prisma/client';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 
@@ -41,6 +41,12 @@ const requireInstitute = (instituteId: string | undefined): string => {
     return instituteId;
 };
 
+/** 256-bit CSPRNG token. The value is never logged. */
+const newInviteToken = (): string => randomBytes(32).toString('hex');
+
+const isExpired = (expiresAt: Date | null, now: Date): boolean =>
+    expiresAt !== null && expiresAt.getTime() <= now.getTime();
+
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
 export async function inviteStudents(
@@ -72,33 +78,47 @@ export async function inviteStudents(
             select: { id: true }
         });
 
+        // Same 404 message as a foreign or missing student, so cross-tenant ids are not revealed.
         if (!students.length) {
-            throw new Error('No valid students found for this institute');
+            throw new Error('Student not found or access denied');
         }
 
-        const validStudentIds = new Set(students.map((s) => s.id));
+        const validStudentIds = [...new Set(students.map((s) => s.id))];
 
-        // 3. Find already-invited active students to skip duplicates
-        const existingInvites = await prisma.testInvite.findMany({
-            where: {
-                testId,
-                studentId: { in: [...validStudentIds] },
-                isActive: true
-            },
-            select: { studentId: true }
+        // 3. Classify every existing row for these students. The table allows one row per (testId, studentId),
+        //    including inactive rows, so a revoked or expired row is reused with a new token instead of inserted again.
+        const existingRows = await prisma.testInvite.findMany({
+            where: { testId, studentId: { in: validStudentIds } },
+            select: { id: true, studentId: true, isActive: true, status: true, expiresAt: true }
         });
+        const rowByStudent = new Map(existingRows.map((row) => [row.studentId, row]));
+        const now = new Date();
 
-        const alreadyInvitedSet = new Set(
-            existingInvites.map((i) => i.studentId)
-        );
+        const rowsToReissue: string[] = [];
+        const studentsToCreate: string[] = [];
+        const issuedStudentIds: string[] = [];
 
-        const newStudentIds = [...validStudentIds].filter(
-            (id) => !alreadyInvitedSet.has(id)
-        );
+        for (const studentId of validStudentIds) {
+            const row = rowByStudent.get(studentId);
 
-        const skipped = studentIds.length - newStudentIds.length;
+            if (!row) {
+                studentsToCreate.push(studentId);
+            } else if (row.status === InviteStatus.COMPLETED) {
+                // A completed invite is never reissued. The student has already responded.
+                continue;
+            } else if (row.isActive && !isExpired(row.expiresAt, now)) {
+                // A duplicate active, unexpired invite is skipped and its token is unchanged.
+                continue;
+            } else {
+                // Revoked (inactive) or expired: reissue with a new token.
+                rowsToReissue.push(row.id);
+            }
+            issuedStudentIds.push(studentId);
+        }
 
-        if (!newStudentIds.length) {
+        const skipped = studentIds.length - issuedStudentIds.length;
+
+        if (!issuedStudentIds.length) {
             return {
                 created: 0,
                 skipped,
@@ -107,28 +127,41 @@ export async function inviteStudents(
             } as any;
         }
 
-        // 4. Generate unique token per student and create invite records
-        const inviteData = newStudentIds.map((studentId) => ({
-            testId,
-            studentId,
-            token: randomBytes(32).toString('hex'), // 256-bit CSPRNG token
-            status: 'PENDING' as const,
-            isActive: true,
-            createdBy: userId
-        }));
+        // 4. Write in one transaction. Each token is a fresh 256-bit CSPRNG value. A reissued row replaces
+        //    the old token, so the old token stops working at the same moment.
+        await prisma.$transaction(async (tx) => {
+            for (const id of rowsToReissue) {
+                await tx.testInvite.update({
+                    where: { id },
+                    data: {
+                        token: newInviteToken(),
+                        status: InviteStatus.PENDING,
+                        isActive: true,
+                        expiresAt: null,
+                        updatedBy: userId
+                    }
+                });
+            }
 
-        // 5. Bulk create invites inside a transaction
-        await prisma.$transaction(
-            inviteData.map((data) =>
-                prisma.testInvite.create({ data })
-            )
-        );
+            for (const studentId of studentsToCreate) {
+                await tx.testInvite.create({
+                    data: {
+                        testId,
+                        studentId,
+                        token: newInviteToken(),
+                        status: InviteStatus.PENDING,
+                        isActive: true,
+                        createdBy: userId
+                    }
+                });
+            }
+        });
 
-        // Fetch created invites to return
+        // Fetch the issued invites, with their new tokens, for the admin's response
         const created = await prisma.testInvite.findMany({
             where: {
                 testId,
-                studentId: { in: newStudentIds },
+                studentId: { in: issuedStudentIds },
                 isActive: true
             },
             select: {
