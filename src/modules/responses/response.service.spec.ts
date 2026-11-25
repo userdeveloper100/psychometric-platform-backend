@@ -20,7 +20,7 @@ jest.mock('../../config/prisma', () => {
         },
         student: { findFirst: jest.fn() },
         psychometricTest: { findFirst: jest.fn() },
-        testInvite: { findFirst: jest.fn(), update: jest.fn() },
+        testInvite: { findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
         question: { findMany: jest.fn() },
     };
     // The submit path runs inside a transaction. The mock passes the same client as the transaction.
@@ -35,7 +35,7 @@ jest.mock('../../config/logger', () => ({
 const responseMock = prisma.response as unknown as Record<'findMany' | 'findFirst' | 'update' | 'count' | 'createMany', jest.Mock>;
 const studentMock = prisma.student as unknown as { findFirst: jest.Mock };
 const testMock = prisma.psychometricTest as unknown as { findFirst: jest.Mock };
-const inviteMock = prisma.testInvite as unknown as { findFirst: jest.Mock; update: jest.Mock };
+const inviteMock = prisma.testInvite as unknown as { findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
 const questionMock = prisma.question as unknown as { findMany: jest.Mock };
 
 const OWN = 'institute-a';
@@ -185,16 +185,19 @@ describe('submitResponses invite validation (SEC-05)', () => {
     };
     const pendingInvite = (overrides: Record<string, unknown> = {}) => ({
         id: 'invite-a',
+        testId: 'test-a',
         studentId: 'student-a',
         status: 'PENDING',
         expiresAt: null,
+        test: { instituteId: OWN, isActive: true },
+        student: { instituteId: OWN, isActive: true },
         ...overrides,
     });
 
     const expectRefusedWithoutToken = async (message: string) => {
         await expect(submitResponses(payload, 'system')).rejects.toThrow(message);
         expect(responseMock.createMany).not.toHaveBeenCalled();
-        expect(inviteMock.update).not.toHaveBeenCalled();
+        expect(inviteMock.updateMany).not.toHaveBeenCalled();
         const logged = JSON.stringify((logger.error as jest.Mock).mock.calls);
         expect(logged).not.toContain(TOKEN);
     };
@@ -222,11 +225,192 @@ describe('submitResponses invite validation (SEC-05)', () => {
         inviteMock.findFirst.mockResolvedValue(pendingInvite({ expiresAt: new Date(Date.now() + 60_000) }));
         questionMock.findMany.mockResolvedValue([{ id: 'question-a', scaleMin: 1, scaleMax: 5 }]);
         responseMock.createMany.mockResolvedValue({ count: 1 });
-        inviteMock.update.mockResolvedValue({});
+        inviteMock.updateMany.mockResolvedValue({ count: 1 });
 
         const result = await submitResponses(payload, 'system');
 
         expect(result).toEqual(expect.objectContaining({ success: true, createdCount: 1 }));
         expect(responseMock.createMany).toHaveBeenCalled();
+    });
+});
+
+// DB-03: response integrity. Every write is bound to the invite, and a refused submission writes nothing.
+describe('submitResponses response integrity (DB-03)', () => {
+    const TOKEN = 'b'.repeat(64);
+    const payload = {
+        token: TOKEN,
+        studentId: 'student-a',
+        responses: [{ questionId: 'question-a', answer: 3 }],
+    };
+    const invite = (overrides: Record<string, unknown> = {}) => ({
+        id: 'invite-a',
+        testId: 'test-a',
+        studentId: 'student-a',
+        status: 'PENDING',
+        expiresAt: null,
+        test: { instituteId: OWN, isActive: true },
+        student: { instituteId: OWN, isActive: true },
+        ...overrides,
+    });
+    const questionsOk = [{ id: 'question-a', scaleMin: 1, scaleMax: 5 }];
+
+    // Refusal must not write rows and must not mark the invite as used.
+    const expectNothingWritten = () => {
+        expect(responseMock.createMany).not.toHaveBeenCalled();
+        expect(inviteMock.updateMany).not.toHaveBeenCalled();
+    };
+
+    beforeEach(() => {
+        inviteMock.findFirst.mockResolvedValue(invite());
+        questionMock.findMany.mockResolvedValue(questionsOk);
+        responseMock.createMany.mockResolvedValue({ count: 1 });
+        inviteMock.updateMany.mockResolvedValue({ count: 1 });
+    });
+
+    test('a valid submission writes responses bound to the invite student and marks the invite completed in the same transaction', async () => {
+        const result = await submitResponses(payload, 'system');
+
+        expect(result).toEqual(expect.objectContaining({ success: true, createdCount: 1 }));
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(inviteMock.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({ id: 'invite-a', status: 'PENDING', isActive: true }),
+            data: expect.objectContaining({ status: 'COMPLETED' }),
+        });
+        expect(responseMock.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ questionId: 'question-a', studentId: 'student-a', answer: 3 })],
+        });
+    });
+
+    test('questions are looked up only within the invited test, its active dimensions, and the institute', async () => {
+        await submitResponses(payload, 'system');
+
+        expect(questionMock.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    id: { in: ['question-a'] },
+                    isActive: true,
+                    dimension: {
+                        isActive: true,
+                        test: { id: 'test-a', isActive: true, instituteId: OWN },
+                    },
+                },
+            })
+        );
+    });
+
+    test('a question from another test (same institute) is refused and writes zero rows', async () => {
+        questionMock.findMany.mockResolvedValue([]);
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('One or more questions are invalid or inactive');
+        expectNothingWritten();
+    });
+
+    test('a question from a test of another institute is refused and writes zero rows', async () => {
+        // The institute is part of the lookup, so a foreign question is never returned.
+        questionMock.findMany.mockResolvedValue([]);
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('One or more questions are invalid or inactive');
+        expectNothingWritten();
+    });
+
+    test('a deactivated question is refused and writes zero rows', async () => {
+        questionMock.findMany.mockResolvedValue([]);
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('One or more questions are invalid or inactive');
+        expectNothingWritten();
+    });
+
+    test('a question under an inactive dimension or inactive test is refused and writes zero rows', async () => {
+        // The lookup filters the dimension and the test, so an inactive parent returns no question.
+        questionMock.findMany.mockResolvedValue([]);
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('One or more questions are invalid or inactive');
+        expect(questionMock.findMany.mock.calls[0][0].where.dimension).toEqual(
+            expect.objectContaining({ isActive: true, test: expect.objectContaining({ isActive: true }) })
+        );
+        expectNothingWritten();
+    });
+
+    test('an inactive invited test is refused with the generic invite message and writes zero rows', async () => {
+        inviteMock.findFirst.mockResolvedValue(invite({ test: { instituteId: OWN, isActive: false } }));
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Invalid or inactive invite token');
+        expectNothingWritten();
+    });
+
+    test('an inactive student is refused with the generic invite message and writes zero rows', async () => {
+        inviteMock.findFirst.mockResolvedValue(invite({ student: { instituteId: OWN, isActive: false } }));
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Invalid or inactive invite token');
+        expectNothingWritten();
+    });
+
+    test('an invite whose student and test are in different institutes is refused and writes zero rows', async () => {
+        inviteMock.findFirst.mockResolvedValue(invite({ student: { instituteId: OTHER, isActive: true } }));
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Invalid or inactive invite token');
+        expectNothingWritten();
+    });
+
+    test('duplicate questionId entries in the payload are refused before any query and write zero rows', async () => {
+        const duplicate = {
+            ...payload,
+            responses: [
+                { questionId: 'question-a', answer: 3 },
+                { questionId: 'question-a', answer: 4 },
+            ],
+        };
+        await expect(submitResponses(duplicate, 'system')).rejects.toThrow('Duplicate question answers are not allowed');
+        expect(inviteMock.findFirst).not.toHaveBeenCalled();
+        expectNothingWritten();
+    });
+
+    test('a spoofed body studentId cannot assign responses to another student: the submission is refused', async () => {
+        await expect(submitResponses({ ...payload, studentId: 'student-b' }, 'system')).rejects.toThrow(
+            'Student does not match invite'
+        );
+        expectNothingWritten();
+    });
+
+    test('a re-submission for an already completed invite is refused and writes zero rows', async () => {
+        inviteMock.findFirst.mockResolvedValue(invite({ status: 'COMPLETED' }));
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Responses already submitted for this invite');
+        expectNothingWritten();
+    });
+
+    test('a concurrent second submission that loses the claim writes zero rows and does not rewrite the invite', async () => {
+        // Another transaction completed the invite first, so the conditional update matches nothing.
+        inviteMock.updateMany.mockResolvedValue({ count: 0 });
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Responses already submitted for this invite');
+        expect(responseMock.createMany).not.toHaveBeenCalled();
+    });
+
+    test('an answer that is not an integer is refused before any query and writes zero rows', async () => {
+        for (const answer of [2.5, '3' as unknown as number, null as unknown as number]) {
+            await expect(
+                submitResponses({ ...payload, responses: [{ questionId: 'question-a', answer }] }, 'system')
+            ).rejects.toThrow('Each response needs a questionId and an integer answer');
+        }
+        expect(inviteMock.findFirst).not.toHaveBeenCalled();
+        expectNothingWritten();
+    });
+
+    test('an answer outside the question scale is refused and writes zero rows', async () => {
+        await expect(
+            submitResponses({ ...payload, responses: [{ questionId: 'question-a', answer: 9 }] }, 'system')
+        ).rejects.toThrow('Answer for question question-a must be between 1 and 5');
+        expectNothingWritten();
+    });
+
+    test('a partial failure in a multi-question payload writes no rows at all', async () => {
+        // One valid question and one foreign question: the lookup returns only the valid one, so the whole submission is refused.
+        questionMock.findMany.mockResolvedValue([{ id: 'question-a', scaleMin: 1, scaleMax: 5 }]);
+        const mixed = {
+            ...payload,
+            responses: [
+                { questionId: 'question-a', answer: 3 },
+                { questionId: 'question-foreign', answer: 3 },
+            ],
+        };
+        await expect(submitResponses(mixed, 'system')).rejects.toThrow('One or more questions are invalid or inactive');
+        expectNothingWritten();
+    });
+
+    test('an empty responses array is refused', async () => {
+        await expect(submitResponses({ ...payload, responses: [] }, 'system')).rejects.toThrow('Responses are required');
+        expect(inviteMock.findFirst).not.toHaveBeenCalled();
     });
 });

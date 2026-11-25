@@ -41,6 +41,48 @@ describe('response.controller', () => {
 
             expect(statusCode(res)).toBe(400);
         });
+
+        // DB-03: content refusals are client errors. They must not fall through to 500.
+        test.each([
+            'One or more questions are invalid or inactive',
+            'Duplicate question answers are not allowed',
+            'Each response needs a questionId and an integer answer',
+            'Student does not match invite',
+            'Answer for question q1 must be between 1 and 5',
+        ])('400 for the refusal "%s"', async (message) => {
+            svc.submitResponses.mockRejectedValue(new Error(message));
+            const req = mockRequest({
+                body: { token: 'tok', studentId: 's1', responses: [{ questionId: 'q1', answer: 3 }] },
+            });
+            const res = mockResponse();
+
+            await responseController.submitResponses(req, res);
+
+            expect(statusCode(res)).toBe(400);
+            expect(jsonBody(res).message).toBe(message);
+        });
+
+        test('500 for an unexpected failure, which is not a client refusal', async () => {
+            svc.submitResponses.mockRejectedValue(new Error('connection reset'));
+            const req = mockRequest({
+                body: { token: 'tok', studentId: 's1', responses: [{ questionId: 'q1', answer: 3 }] },
+            });
+            const res = mockResponse();
+
+            await responseController.submitResponses(req, res);
+
+            expect(statusCode(res)).toBe(500);
+        });
+
+        test('400 when responses is not an array', async () => {
+            const req = mockRequest({ body: { token: 'tok', studentId: 's1', responses: { questionId: 'q1', answer: 3 } } });
+            const res = mockResponse();
+
+            await responseController.submitResponses(req, res);
+
+            expect(statusCode(res)).toBe(400);
+            expect(svc.submitResponses).not.toHaveBeenCalled();
+        });
     });
 
     describe('getStudentResponses', () => {

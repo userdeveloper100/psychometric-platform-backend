@@ -36,48 +36,80 @@ const requireInstitute = (instituteId: string | undefined): string => {
     return instituteId;
 };
 
+const isExpired = (expiresAt: Date | null, now: Date): boolean =>
+    expiresAt !== null && expiresAt.getTime() <= now.getTime();
+
+/**
+ * DB-03: a submission is accepted only if it is bound to a valid invite. The invite decides the student,
+ * the test and the institute. Body values for those are used only to check that they match, never to write.
+ * Every check and every write runs in one transaction, so a refused submission leaves no partial rows.
+ */
 export const submitResponses = async (data: SubmitResponsesInput, userId: string) => {
     const { token, studentId, responses } = data;
 
     if (!token) throw new Error('Token is required');
     if (!studentId) throw new Error('Student ID is required');
-    if (!responses || responses.length === 0) throw new Error('Responses are required');
+    if (!Array.isArray(responses) || responses.length === 0) throw new Error('Responses are required');
+
+    // Payload shape checks need no database read. Each one refuses the submission before any query runs.
+    const isWellFormed = responses.every(
+        (r) => typeof r.questionId === 'string' && r.questionId.length > 0 && Number.isInteger(r.answer)
+    );
+    if (!isWellFormed) throw new Error('Each response needs a questionId and an integer answer');
+
+    const questionIds = responses.map((r) => r.questionId);
+    if (new Set(questionIds).size !== questionIds.length) {
+        throw new Error('Duplicate question answers are not allowed');
+    }
 
     try {
         const now = new Date();
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1) Find invite
+            // 1) The invite is the only source of truth for the student, the test and the institute.
             const invite = await tx.testInvite.findFirst({
-                where: {
-                    token,
-                    isActive: true
+                where: { token, isActive: true },
+                select: {
+                    id: true,
+                    testId: true,
+                    studentId: true,
+                    status: true,
+                    expiresAt: true,
+                    test: { select: { instituteId: true, isActive: true } },
+                    student: { select: { instituteId: true, isActive: true } }
                 }
             });
 
-            // 2) Invite must exist
+            // 2) Invite must exist and be pending and unexpired (SEC-05). Messages never include the token.
             if (!invite) throw new Error('Invalid or inactive invite token');
-
-            // 3) Invite should be pending and not expired (SEC-05). Messages never include the token.
-            if (invite.status === InviteStatus.COMPLETED) {
+            if (invite.status !== InviteStatus.PENDING) {
                 throw new Error('Responses already submitted for this invite');
             }
-            if (invite.expiresAt && invite.expiresAt.getTime() <= now.getTime()) {
-                throw new Error('Invite has expired');
+            if (isExpired(invite.expiresAt, now)) throw new Error('Invite has expired');
+
+            // 3) A studentId in the body must match the invite. A mismatch is refused, never reassigned.
+            if (invite.studentId !== studentId) throw new Error('Student does not match invite');
+
+            // 4) The invited test and student must both be active and belong to the same institute.
+            const sameInstitute = invite.test.instituteId === invite.student.instituteId;
+            if (!invite.test.isActive || !invite.student.isActive || !sameInstitute) {
+                throw new Error('Invalid or inactive invite token');
             }
 
-            // 4) Student must match invite
-            if (invite.studentId !== studentId) {
-                throw new Error('Student does not match invite');
-            }
-
-            // 5) Validate questions
-            const questionIds = [...new Set(responses.map((r) => r.questionId))];
-
+            // 5) Every question must be active, under an active dimension, of the invited test. A question from
+            //    another test, another institute, or an inactive parent is missing from this result and refused.
             const questions = await tx.question.findMany({
                 where: {
                     id: { in: questionIds },
-                    isActive: true
+                    isActive: true,
+                    dimension: {
+                        isActive: true,
+                        test: {
+                            id: invite.testId,
+                            isActive: true,
+                            instituteId: invite.test.instituteId
+                        }
+                    }
                 },
                 select: {
                     id: true,
@@ -90,12 +122,11 @@ export const submitResponses = async (data: SubmitResponsesInput, userId: string
                 throw new Error('One or more questions are invalid or inactive');
             }
 
+            // 6) Each answer must be inside the question's scale.
             const questionMap = new Map(questions.map((q) => [q.id, q]));
-
-            // 6) Validate answers in range
             for (const response of responses) {
                 const question = questionMap.get(response.questionId);
-                if (!question) throw new Error(`Question not found: ${response.questionId}`);
+                if (!question) throw new Error('One or more questions are invalid or inactive');
 
                 if (response.answer < question.scaleMin || response.answer > question.scaleMax) {
                     throw new Error(
@@ -104,29 +135,39 @@ export const submitResponses = async (data: SubmitResponsesInput, userId: string
                 }
             }
 
-            // 7,8) Save responses
-            const createResult = await tx.response.createMany({
-                data: responses.map((r) => ({
-                    questionId: r.questionId,
-                    studentId,
-                    answer: r.answer,
-                    createdBy: userId,
-                    createdAt: now,
-                    isActive: true
-                }))
-            });
-
-            // 9,10) Update invite
-            await tx.testInvite.update({
-                where: { id: invite.id },
+            // 7) Claim the invite before writing. The update matches only a pending, unexpired invite. A concurrent
+            //    second submission waits on the row lock, re-checks, matches nothing, and rolls back with no rows.
+            const claimed = await tx.testInvite.updateMany({
+                where: {
+                    id: invite.id,
+                    isActive: true,
+                    status: InviteStatus.PENDING,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                },
                 data: {
                     status: InviteStatus.COMPLETED,
                     updatedBy: userId,
                     updatedAt: now
                 }
             });
+            if (claimed.count !== 1) throw new Error('Responses already submitted for this invite');
 
-            return createResult;
+            // 8) Save responses. The student comes from the invite, not from the request body.
+            return tx.response.createMany({
+                data: responses.map((r) => ({
+                    questionId: r.questionId,
+                    studentId: invite.studentId,
+                    answer: r.answer,
+                    createdBy: userId,
+                    createdAt: now,
+                    isActive: true
+                }))
+            });
+        }, {
+            // A concurrent second submission waits on the invite row lock until the first commits. That wait can exceed
+            // Prisma's default 2s start window, which would surface as a 500 instead of the 400 refusal.
+            maxWait: 5000,
+            timeout: 10000
         });
 
         return {

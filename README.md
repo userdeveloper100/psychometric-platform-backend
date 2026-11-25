@@ -847,6 +847,7 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | `SEC-02` Role & Tenant Authorization on Institute Endpoints | Reusable `authorizeRoles` middleware (401 with no user, 403 for the wrong role). All five institute routes require ADMIN. An ADMIN can view, update or delete only their own institute; a foreign institute returns 404 before any cascade runs. Listing is scoped to the requester's institute. Spoofed `instituteId` values in query or body are ignored | `security: protect institute endpoints with role authorization` |
 | `SEC-01` Institute Ownership for Test Publish & Delete | Institute is derived from `req.user` only; lookups scoped by institute; a foreign test returns 404 (same as a missing test); a spoofed body `instituteId` is ignored | `security: enforce institute ownership for tests` |
 | `SEC-03` Response Tenant Isolation & Role Authorization | Response list, student read, test read and delete require ADMIN (STUDENT gets 403). Every read and delete is scoped through student and test to the requester's institute; a foreign student, test or response returns 404 with no data; a missing institute fails closed. Student submission is unchanged | `security: enforce response tenant isolation` |
+| `DB-03` Assessment Response Integrity | A submission is bound to its invite. The invite alone decides the student, test and institute: a body `studentId`, `instituteId` or `testId` never reassigns a response, and a mismatched `studentId` is refused (400). Every submitted question must be active, under an active dimension, of the invited test and institute, so a question from another test or institute is refused. Duplicate question ids, non-integer or out-of-scale answers, and empty payloads are refused (400). Validation, the invite claim and the response insert run in one `prisma.$transaction`, so a refused submission writes no rows. The claim is conditional, so two concurrent submissions for one invite save exactly one. Content refusals now return 400, not 500. **All P0 and P1 items are now complete.** Remaining: `DEC-01..04` | `fix: enforce assessment response integrity` |
 | `DB-02` Student Re-Invitation After Revoke, Expiry or Soft Delete | A student can be invited again to a test after the earlier invite was revoked or expired. The invite row is reused with a fresh 256-bit token, so the old token is refused and the new one submits. A duplicate active invite is skipped, and a completed invite is never reissued. Re-creating a soft-deleted student with the same email works: the create route no longer requires a body `instituteId` that the server ignored. No migration was needed. Re-invites stay tenant scoped (a foreign student or test returns 404) | `fix: allow valid student reinvitations` |
 | `DB-01` Soft-Delete Cascade Relationships | Each soft-delete cascade (Institute, Test, Dimension, Question, Student) runs in one `prisma.$transaction`, with children matched by their real foreign keys. The old generic cascade had wrong lookups (for example institute → `testId`, invite → `studentId`) and returned 500 for an own-institute delete. `updatedBy` now records the acting user (test delete recorded the institute id). Dimension delete now also soft deletes the responses of its questions. Users of a deleted institute are deactivated, as before. Rows are never removed | `fix: correct soft delete cascade relationships` |
 | `SEC-10` Tenant-Scoped Reporting & Report Parameter Fix | Fixed the report handlers that read `req.params.id` while the routes define `:testId` and `:studentId` (every valid report returned 400). The student report route has its own handler and returns one student. All report routes are ADMIN-only (STUDENT 403, no token 401). Test, student and list reports are scoped to the caller's institute; a foreign or non-existent test or student returns 404. Inactive students, tests, dimensions, questions and responses are excluded. Student self-service reports are not offered until DEC-03 is decided. **All P0 security items are now complete:** SEC-07, SEC-01, SEC-02, SEC-03, SEC-05, SEC-06 and SEC-10 | `security: enforce tenant scoped reporting` |
@@ -857,7 +858,6 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Task | Scope |
 |---|---|
-| `DB-03` | Enforce assessment response question and student integrity |
 | `DEC-01` | Platform model decision (institute and student platform, or recruiting SaaS) |
 | `DEC-02` | Signup model decision (open signup or invite-only) |
 | `DEC-03` | Student identity model decision (how students authenticate to submit answers) |
@@ -869,9 +869,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 25 of 25 suites, **283 of 283 tests passed** |
-| Integration (active) | `npm run test:integration` | 10 of 10 suites, **183 of 183 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-03 has no pending test yet |
+| Unit | `npm test` | 25 of 25 suites, **307 of 307 tests passed** |
+| Integration (active) | `npm run test:integration` | 11 of 11 suites, **200 of 200 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02 and DB-03 needed none |
 
 ---
 

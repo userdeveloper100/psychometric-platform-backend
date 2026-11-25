@@ -38,12 +38,33 @@ const handleScopedError = (res: Response, error: any, fallback: string): Respons
     return serverErrorResponse(res, error.message || fallback);
 };
 
+/**
+ * DB-03: a refused submission (bad invite, wrong student, foreign or inactive question, duplicate or
+ * out-of-range answer) is a client error, so it maps to 400. Only unexpected failures reach 500.
+ * Messages never include the invite token.
+ */
+const SUBMISSION_REFUSALS: readonly string[] = [
+    'Token is required',
+    'Student ID is required',
+    'Responses are required',
+    'Each response needs a questionId and an integer answer',
+    'Duplicate question answers are not allowed',
+    'Invalid or inactive invite token',
+    'Responses already submitted for this invite',
+    'Invite has expired',
+    'Student does not match invite',
+    'One or more questions are invalid or inactive',
+];
+
+const isSubmissionRefusal = (message: string): boolean =>
+    SUBMISSION_REFUSALS.includes(message) || /^Answer for question .+ must be between /.test(message);
+
 export const submitResponses = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { token, studentId, responses } = req.body;
         const userId = getUserId(req);
 
-        if (!token || !studentId || !responses || responses.length === 0) {
+        if (!token || !studentId || !Array.isArray(responses) || responses.length === 0) {
             return badRequestResponse(res, 'token, studentId, and responses are required');
         }
 
@@ -54,10 +75,7 @@ export const submitResponses = async (req: Request, res: Response): Promise<Resp
 
         return createdResponse(res, result, 'Responses submitted successfully');
     } catch (error: any) {
-        if (error.message === 'Invalid or inactive invite token' || 
-            error.message === 'Responses already submitted for this invite' ||
-            error.message === 'Student does not match invite' ||
-            error.message === 'Invite has expired') {
+        if (isSubmissionRefusal(error.message)) {
             return badRequestResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to submit responses');
