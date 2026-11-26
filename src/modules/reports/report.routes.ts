@@ -8,7 +8,7 @@ const router = Router();
 // Only ADMIN can access reports
 /**
  * @swagger
- * /api/reports:
+ * /api/v1/reports:
  *   get:
  *     summary: Get all reports
  *     description: Fetch all active report source records with optional pagination.
@@ -89,7 +89,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-    '/reports/student/:studentId/test/:testId',
+    '/student/:studentId/test/:testId',
     authenticateJWT,
     authorizeRoles('ADMIN'),
     reportController.getStudentReport
@@ -136,7 +136,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-    '/reports/test/:testId',
+    '/test/:testId',
     authenticateJWT,
     authorizeRoles('ADMIN'),
     reportController.getTestReport

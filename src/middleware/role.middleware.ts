@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 import { logSecurityEvent } from '../utils/security-logger';
 
-/** The route template, such as "DELETE /api/tests/:id". No ids, no query string, no body. A root route has no trailing slash. */
+/** The route template, such as "DELETE /api/v1/tests/:id". No ids, no query string, no body. A root route has no trailing slash. */
 const routeAction = (req: Request): string => {
     const path = req.route?.path ?? '';
     return `${req.method} ${req.baseUrl}${path === '/' ? '' : path}`;

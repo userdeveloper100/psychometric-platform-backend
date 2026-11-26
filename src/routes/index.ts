@@ -21,7 +21,4 @@ router.use('/responses', responseRoutes);
 router.use('/reports', reportRoutes);
 router.use('/invites', inviteRoutes);
 
-// Health check
-router.get('/health', (req, res) => res.json({ status: 'ok' }));
-
 export default router;

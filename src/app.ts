@@ -47,8 +47,11 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // API rate limiting (fail-open when Redis is unavailable)
 app.use("/api", globalRateLimiter);
 
-// routes
-app.use("/api", routes);
+// routes. DEC-04: every module is mounted under /api/v1. The unversioned /api/... paths are not served (404).
+app.use("/api/v1", routes);
+
+// Health check: an unversioned operational endpoint, outside the API version.
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 // error handler
 app.use(errorMiddleware);

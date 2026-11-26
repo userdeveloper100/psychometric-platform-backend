@@ -15,7 +15,7 @@ describe('security-logger: structured fields', () => {
     test('emits the event, timestamp and the safe metadata fields', () => {
         const entry = buildSecurityEntry(
             'authorization_denied',
-            { userId: 'u1', instituteId: 'i1', role: 'STUDENT', action: 'POST /api/tests', reason: 'role_not_permitted' },
+            { userId: 'u1', instituteId: 'i1', role: 'STUDENT', action: 'POST /api/v1/tests', reason: 'role_not_permitted' },
             NOW
         );
 
@@ -25,7 +25,7 @@ describe('security-logger: structured fields', () => {
             userId: 'u1',
             instituteId: 'i1',
             role: 'STUDENT',
-            action: 'POST /api/tests',
+            action: 'POST /api/v1/tests',
             reason: 'role_not_permitted',
         });
     });

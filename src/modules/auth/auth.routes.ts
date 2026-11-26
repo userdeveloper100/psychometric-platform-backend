@@ -8,7 +8,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/auth/register:
+ * /api/v1/auth/register:
  *   post:
  *     summary: Register a new institute admin
  *     description: Creates a new institute admin account and returns created user details.
@@ -120,7 +120,7 @@ router.post('/register', authRateLimiter, authController.register);
 
 /**
  * @swagger
- * /api/auth/login:
+ * /api/v1/auth/login:
  *   post:
  *     summary: Login user
  *     description: Authenticates user credentials and returns a JWT token.
@@ -222,7 +222,7 @@ router.post('/login', authRateLimiter, authController.login);
 
 /**
  * @swagger
- * /api/auth/users:
+ * /api/v1/auth/users:
  *   get:
  *     summary: Get all users (Admin only)
  *     description: Retrieves a paginated list of all users. Requires admin role.

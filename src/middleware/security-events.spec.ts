@@ -80,7 +80,7 @@ describe('security events: authorization_denied and auth_failed (authorizeRoles)
     test('a STUDENT on an ADMIN route logs authorization_denied with the verified fields and the route template', () => {
         const req = mockRequest({
             method: 'DELETE',
-            baseUrl: '/api/tests',
+            baseUrl: '/api/v1/tests',
             route: { path: '/:id' },
             params: { id: 'test-123' },
             user: { userId: 'u9', role: 'STUDENT', instituteId: 'i1' },
@@ -97,14 +97,14 @@ describe('security events: authorization_denied and auth_failed (authorizeRoles)
             userId: 'u9',
             instituteId: 'i1',
             role: 'STUDENT',
-            action: 'DELETE /api/tests/:id',
+            action: 'DELETE /api/v1/tests/:id',
             reason: 'role_not_permitted',
         });
         expect(allLogged()).not.toContain('secret.jwt.value');
     });
 
     test('a request with no verified user logs auth_failed and returns the existing 401', () => {
-        const { res } = run(mockRequest({ method: 'GET', baseUrl: '/api/users' }));
+        const { res } = run(mockRequest({ method: 'GET', baseUrl: '/api/v1/users' }));
         expect(statusCode(res)).toBe(401);
         expect(loggedEntry()).toEqual(expect.objectContaining({ event: 'auth_failed', reason: 'no_authenticated_user' }));
     });

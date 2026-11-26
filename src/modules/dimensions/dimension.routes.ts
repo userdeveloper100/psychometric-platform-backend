@@ -7,7 +7,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/dimensions:
+ * /api/v1/dimensions:
  *   get:
  *     summary: Get all dimensions
  *     description: Fetch all active dimensions with optional pagination.
@@ -41,7 +41,7 @@ router.get(
 
 /**
  * @swagger
- * /api/dimensions/tests/{testId}/dimensions:
+ * /api/v1/dimensions/tests/{testId}/dimensions:
  *   get:
  *     summary: Get dimensions by test
  *     description: Fetch all dimensions for a given psychometric test.
@@ -126,7 +126,7 @@ router.get(
  */
 /**
  * @swagger
- * /api/v1/tests/{testId}/dimensions:
+ * /api/v1/dimensions/tests/{testId}/dimensions:
  *   get:
  *     summary: Retrieve resource (/tests/:testId/dimensions)
  *     description: Dimensions API endpoint.
@@ -172,7 +172,7 @@ router.get(
 
 /**
  * @swagger
- * /api/dimensions/tests/{testId}/dimensions:
+ * /api/v1/dimensions/tests/{testId}/dimensions:
  *   post:
  *     summary: Create dimension for a test
  *     description: Create a new dimension under a given test. ADMIN role required.
@@ -274,7 +274,7 @@ router.get(
  */
 /**
  * @swagger
- * /api/v1/tests/{testId}/dimensions:
+ * /api/v1/dimensions/tests/{testId}/dimensions:
  *   post:
  *     summary: Create resource (/tests/:testId/dimensions)
  *     description: Dimensions API endpoint.
@@ -331,7 +331,7 @@ router.post(
 
 /**
  * @swagger
- * /api/dimensions/dimensions/{id}:
+ * /api/v1/dimensions/{id}:
  *   delete:
  *     summary: Delete a dimension
  *     description: Permanently deletes a dimension by ID. ADMIN role required.
@@ -447,7 +447,7 @@ router.post(
  *         description: Internal server error
  */
 router.delete(
-    '/dimensions/:id',
+    '/:id',
     authenticateJWT,
     authorizeRoles('ADMIN'),
     dimensionController.deleteDimension

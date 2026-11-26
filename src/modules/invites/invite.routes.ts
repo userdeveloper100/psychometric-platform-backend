@@ -7,7 +7,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/invites:
+ * /api/v1/invites:
  *   get:
  *     summary: Get all invites
  *     description: Fetch all active invites with optional pagination.
@@ -41,13 +41,13 @@ router.get(
 );
 
 /**
- * @route   POST /api/invites/tests/:testId/invite
+ * @route   POST /api/v1/invites/tests/:testId/invite
  * @desc    Invite students to a test (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/tests/{testId}/invite:
+ * /api/v1/invites/tests/{testId}/invite:
  *   post:
  *     summary: Create resource (/tests/:testId/invite)
  *     description: Invites API endpoint.
@@ -103,13 +103,13 @@ router.post(
 );
 
 /**
- * @route   GET /api/invites/tests/:testId/invites
+ * @route   GET /api/v1/invites/tests/:testId/invites
  * @desc    Get all invites for a test (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/tests/{testId}/invites:
+ * /api/v1/invites/tests/{testId}/invites:
  *   get:
  *     summary: Retrieve resource (/tests/:testId/invites)
  *     description: Invites API endpoint.
@@ -155,13 +155,13 @@ router.get(
 );
 
 /**
- * @route   GET /api/invites/students/:studentId/invites
+ * @route   GET /api/v1/invites/students/:studentId/invites
  * @desc    Get all invites for a student
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/students/{studentId}/invites:
+ * /api/v1/invites/students/{studentId}/invites:
  *   get:
  *     summary: Retrieve resource (/students/:studentId/invites)
  *     description: Invites API endpoint.
@@ -207,13 +207,13 @@ router.get(
 );
 
 /**
- * @route   DELETE /api/invites/:id
+ * @route   DELETE /api/v1/invites/:id
  * @desc    Soft delete an invite (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/invites/{id}:
  *   delete:
  *     summary: Delete resource (/:id)
  *     description: Invites API endpoint.

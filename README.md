@@ -565,20 +565,63 @@ http://localhost:5001/api-docs
 
 # API Versioning
 
-All APIs follow versioned routes:
+Every module is served under `/api/v1/<resource>` (`DEC-04`). The unversioned `/api/...` paths are not served and return `404`. `GET /health` stays at the root, outside the API version.
 
-```text
-/api/v1/*
-```
+| Module | Method | Path | Access |
+|---|---|---|---|
+| Auth | POST | `/api/v1/auth/register` | Public (rate limited) |
+| Auth | POST | `/api/v1/auth/login` | Public (rate limited) |
+| Auth | GET | `/api/v1/auth/users` | ADMIN, own institute |
+| Institutes | POST | `/api/v1/institutes` | ADMIN |
+| Institutes | GET | `/api/v1/institutes` | ADMIN |
+| Institutes | GET, PUT, DELETE | `/api/v1/institutes/{id}` | ADMIN, own institute only |
+| Tests | POST | `/api/v1/tests` | ADMIN |
+| Tests | GET | `/api/v1/tests` | Any user, own institute |
+| Tests | PATCH | `/api/v1/tests/{id}/publish` | ADMIN |
+| Tests | DELETE | `/api/v1/tests/{id}` | ADMIN |
+| Dimensions | GET | `/api/v1/dimensions` | Any user, own institute |
+| Dimensions | GET | `/api/v1/dimensions/tests/{testId}/dimensions` | Any user, own institute |
+| Dimensions | POST | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN |
+| Dimensions | DELETE | `/api/v1/dimensions/{id}` | ADMIN |
+| Questions | GET | `/api/v1/questions` | Any user, own institute |
+| Questions | GET | `/api/v1/questions/dimensions/{dimensionId}/questions` | Any user, own institute |
+| Questions | POST | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN |
+| Questions | DELETE | `/api/v1/questions/{id}` | ADMIN |
+| Students | GET | `/api/v1/students` | ADMIN |
+| Students | POST | `/api/v1/students/AddStudent` | ADMIN |
+| Students | POST | `/api/v1/students/bulk-upload` | ADMIN |
+| Students | DELETE | `/api/v1/students/{id}` | ADMIN |
+| Invites | GET | `/api/v1/invites` | ADMIN |
+| Invites | POST | `/api/v1/invites/tests/{testId}/invite` | ADMIN |
+| Invites | GET | `/api/v1/invites/tests/{testId}/invites` | ADMIN |
+| Invites | GET | `/api/v1/invites/students/{studentId}/invites` | ADMIN |
+| Invites | DELETE | `/api/v1/invites/{id}` | ADMIN |
+| Responses | GET | `/api/v1/responses` | ADMIN |
+| Responses | POST | `/api/v1/responses/submit` | Any authenticated user, bound to the invite token |
+| Responses | GET | `/api/v1/responses/student/{studentId}` | ADMIN |
+| Responses | GET | `/api/v1/responses/test/{testId}` | ADMIN |
+| Responses | DELETE | `/api/v1/responses/{id}` | ADMIN |
+| Reports | GET | `/api/v1/reports` | ADMIN |
+| Reports | GET | `/api/v1/reports/test/{testId}` | ADMIN |
+| Reports | GET | `/api/v1/reports/student/{studentId}/test/{testId}` | ADMIN |
+| Health | GET | `/health` | Public |
 
-Examples:
+**Route changes in `DEC-04` (old → new):**
 
-```http
-GET /api/v1/students
-POST /api/v1/tests
-GET /api/v1/tests/:id
-POST /api/v1/questions
-```
+| Old path | New path |
+|---|---|
+| `/api/<module>/...` (every module) | `/api/v1/<module>/...` |
+| `/api/responses/responses/submit` | `/api/v1/responses/submit` |
+| `/api/responses/responses/student/{studentId}` | `/api/v1/responses/student/{studentId}` |
+| `/api/responses/responses/test/{testId}` | `/api/v1/responses/test/{testId}` |
+| `/api/responses/responses/{id}` | `/api/v1/responses/{id}` |
+| `/api/reports/reports/test/{testId}` | `/api/v1/reports/test/{testId}` |
+| `/api/reports/reports/student/{studentId}/test/{testId}` | `/api/v1/reports/student/{studentId}/test/{testId}` |
+| `/api/dimensions/dimensions/{id}` | `/api/v1/dimensions/{id}` |
+| `/api/questions/questions/{id}` | `/api/v1/questions/{id}` |
+| `/api/health` | `/health` |
+
+`/api/students/AddStudent` keeps its existing name under the new prefix, `/api/v1/students/AddStudent`. Renaming it is a separate decision, because the path is not a duplicate.
 
 ---
 
@@ -841,6 +884,7 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Task | Summary | Reference |
 |---|---|---|
+| `DEC-04` Standardized `/api/v1` Routes & Duplicate Segment Cleanup | Every module router is mounted under `/api/v1/<resource>`. The unversioned `/api/...` paths return 404. The duplicated segments are removed: `/responses/responses/...`, `/reports/reports/...`, `/dimensions/dimensions/...` and `/questions/questions/...` are now `/responses/...`, `/reports/...`, `/dimensions/...` and `/questions/...`. Health moved to `GET /health` at the root. Swagger annotations show the real full paths. Authentication, role checks and tenant checks are unchanged. The full old-to-new table is in the API Versioning section | `feat: standardize api v1 routes and remove duplicate path segments` |
 | Backend Implementation Audit & Roadmap | Five audit documents in `docs/` | `94cc856` |
 | `SEC-11` Integration Test Infrastructure | Isolated `psychometric_test` database guard, fixtures, supertest harness | `9fa8803`, `docs/INTEGRATION_TESTING.md` |
 | `SEC-07` Centralized Environment & JWT Secret Validation | `src/config/env.ts` validates configuration at startup; JWT secret must be at least 32 characters; hard-coded fallback secrets removed | `6c9e926` |
@@ -855,18 +899,20 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 | `SEC-06` Dimension & Question Ownership | Dimension and question writes (create and delete) require ADMIN (STUDENT gets 403). Each write checks the full chain (question → dimension → test → institute, all active) before any write or cascade; a foreign or inactive parent returns 404 and the other institute's rows are untouched. Global lists are scoped to the institute. Reads stay available to any user of the same institute (documented in `docs/INTEGRATION_TESTING.md`). No update routes exist for these entities | `security: validate dimension and question ownership` |
 | `SEC-05` Invite Token Protection & Access | Invite listings and reads never return a token; a token is returned once, to the admin who creates the invite. All invite routes require ADMIN (STUDENT gets 403) and are scoped to the requester's institute (foreign invite or student returns 404). Tokens use `randomBytes(32)`. Submission refuses expired invites. Unknown, revoked, expired and used tokens are refused without echoing the token. **Not done:** tokens are still stored in plaintext; hashing at rest needs a migration and a decision on existing invites | `security: protect invite tokens and access` |
 
-## Pending (`PENDING`)
+## Decisions
 
-| Task | Scope |
+| Decision | Status |
 |---|---|
-| `DEC-01` | Platform model decision (institute and student platform, or recruiting SaaS) |
-| `DEC-02` | Signup model decision (open signup or invite-only) |
-| `DEC-03` | Student identity model decision (how students authenticate to submit answers) |
-| `DEC-04` | API versioning decision (`/api` or `/api/v1`) |
+| `DEC-01` Multi-tenant Enterprise Recruiting SaaS | `DECIDED — IMPLEMENTATION NEXT` |
+| `DEC-02` Invitation-only onboarding | `DECIDED — IMPLEMENTATION NEXT` |
+| `DEC-03` Token-bound candidates via `TestInvite` | `DECIDED — IMPLEMENTATION NEXT` |
+| `DEC-04` Standardized `/api/v1` routes | `DONE` (see Completed) |
 
-**Post-decision follow-ups** (not started, each depends on a decision above or a migration):
+The three decided items are recorded here. Their behaviour changes are not implemented yet, so the current code still reflects the state before the decisions.
 
-- **DEC-03:** student self-service reports and linking a `Student` to a `User`. Until then the student submission route stays token-bound only, and the dimension, question and test reads are scoped to the institute for any authenticated user.
+**Post-decision follow-ups** (not started; each depends on the decisions above or on a migration):
+
+- **DEC-03 (implementation next):** candidates are identified by their `TestInvite` token. Student self-service reports and linking a `Student` to a `User` follow from it. Until that is implemented, the student submission route stays token-bound only, and the dimension, question and test reads are scoped to the institute for any authenticated user.
 - **Invite tokens at rest:** tokens are still stored in plaintext. Hashing needs a migration and a decision on how existing invites are handled.
 - **API documentation in production:** `/api-docs` is served whenever the app runs. Decide whether it is disabled in production.
 - **Unrouted code, not tenant scoped:** `getInstitutes` in `institute.service.ts` (search across all institutes) has no route. Its query is not scoped to the requester, so it must be removed or scoped before anyone routes it. This is the one known exception to the release-gate rule that tenant lookups are scoped.
@@ -878,8 +924,8 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 | Suite | Command | Result |
 |---|---|---|
 | Unit | `npm test` | 28 of 28 suites, **333 of 333 tests passed** |
-| Integration (active) | `npm run test:integration` | 12 of 12 suites, **215 of 215 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02 and DB-03 needed none |
+| Integration (active) | `npm run test:integration` | 13 of 13 suites, **234 of 234 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03 and DEC-04 needed none |
 
 ---
 

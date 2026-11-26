@@ -6,13 +6,13 @@ import { authorizeRoles } from '../../middleware/role.middleware';
 const router = Router();
 
 /**
- * @route   POST /api/tests
+ * @route   POST /api/v1/tests
  * @desc    Create a new test (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/:
+ * /api/v1/tests:
  *   post:
  *     summary: Create resource (/)
  *     description: Tests API endpoint.
@@ -53,13 +53,13 @@ const router = Router();
 router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.createTest);
 
 /**
- * @route   GET /api/tests?instituteId=...&page=1&limit=10&status=DRAFT|PUBLISHED&search=...
+ * @route   GET /api/v1/tests?instituteId=...&page=1&limit=10&status=DRAFT|PUBLISHED&search=...
  * @desc    Get tests for an institute (paginated)
  * @access  Private/Public (based on your middleware setup)
  */
 /**
  * @swagger
- * /api/tests:
+ * /api/v1/tests:
  *   get:
  *     summary: Get all tests
  *     description: Fetch all active tests with optional pagination.
@@ -105,13 +105,13 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.create
 router.get('/', authenticateJWT, testController.getAllTests);
 
 /**
- * @route   PATCH /api/tests/:id/publish
+ * @route   PATCH /api/v1/tests/:id/publish
  * @desc    Publish a test (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/{id}/publish:
+ * /api/v1/tests/{id}/publish:
  *   patch:
  *     summary: Partially update resource (/:id/publish)
  *     description: Tests API endpoint.
@@ -160,13 +160,13 @@ router.get('/', authenticateJWT, testController.getAllTests);
 router.patch('/:id/publish', authenticateJWT, authorizeRoles('ADMIN'), testController.publishTest);
 
 /**
- * @route   DELETE /api/tests/:id
+ * @route   DELETE /api/v1/tests/:id
  * @desc    Delete a test (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/tests/{id}:
  *   delete:
  *     summary: Delete resource (/:id)
  *     description: Tests API endpoint.

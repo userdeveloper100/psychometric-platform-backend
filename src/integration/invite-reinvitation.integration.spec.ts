@@ -22,10 +22,10 @@ afterAll(async () => {
 const HEX_64 = /^[0-9a-f]{64}$/;
 
 const inviteStudent = (testId: string, studentId: string, token = fx.a.adminToken) =>
-    api.post(`/api/invites/tests/${testId}/invite`, token).send({ studentIds: [studentId] });
+    api.post(`/api/v1/invites/tests/${testId}/invite`, token).send({ studentIds: [studentId] });
 
 const submitWith = (token: string, studentId: string, studentToken = fx.a.studentToken) =>
-    api.post('/api/responses/responses/submit', studentToken).send({
+    api.post('/api/v1/responses/submit', studentToken).send({
         token,
         studentId,
         responses: [{ questionId: fx.a.question.id, answer: 2 }],
@@ -37,7 +37,7 @@ const inviteRows = (testId: string, studentId: string) =>
 describe('DB-02: re-invite after the invite was revoked', () => {
     test('revoke, then re-invite: 201 with a new token, and the new row is the only one for the pair', async () => {
         const oldToken = fx.a.invite.token;
-        expect((await api.delete(`/api/invites/${fx.a.invite.id}`, fx.a.adminToken)).status).toBe(200);
+        expect((await api.delete(`/api/v1/invites/${fx.a.invite.id}`, fx.a.adminToken)).status).toBe(200);
 
         const res = await inviteStudent(fx.a.test.id, fx.a.student.id);
         expect(res.status).toBe(201);
@@ -55,7 +55,7 @@ describe('DB-02: re-invite after the invite was revoked', () => {
 
     test('the new token submits (201) and the old, revoked token is refused (400)', async () => {
         const oldToken = fx.a.invite.token;
-        await api.delete(`/api/invites/${fx.a.invite.id}`, fx.a.adminToken);
+        await api.delete(`/api/v1/invites/${fx.a.invite.id}`, fx.a.adminToken);
         const issued = (await inviteStudent(fx.a.test.id, fx.a.student.id)).body.data.invites[0];
 
         const oldSubmit = await submitWith(oldToken, fx.a.student.id);
@@ -68,10 +68,10 @@ describe('DB-02: re-invite after the invite was revoked', () => {
     });
 
     test('the re-issued token is never returned by a later list or read', async () => {
-        await api.delete(`/api/invites/${fx.a.invite.id}`, fx.a.adminToken);
+        await api.delete(`/api/v1/invites/${fx.a.invite.id}`, fx.a.adminToken);
         const issued = (await inviteStudent(fx.a.test.id, fx.a.student.id)).body.data.invites[0];
 
-        const list = await api.get(`/api/invites/tests/${fx.a.test.id}/invites`, fx.a.adminToken);
+        const list = await api.get(`/api/v1/invites/tests/${fx.a.test.id}/invites`, fx.a.adminToken);
         expect(list.status).toBe(200);
         expect(bodyText(list)).not.toContain(issued.token);
     });
@@ -135,7 +135,7 @@ describe('DB-02: rules that must not reissue', () => {
 
 describe('DB-02: soft-deleted student and re-creation', () => {
     test('a soft-deleted student cannot be invited by the old id (404), and their invites stay inactive', async () => {
-        expect((await api.delete(`/api/students/${fx.a.student.id}`, fx.a.adminToken)).status).toBe(200);
+        expect((await api.delete(`/api/v1/students/${fx.a.student.id}`, fx.a.adminToken)).status).toBe(200);
         const res = await inviteStudent(fx.a.test.id, fx.a.student.id);
         expect(res.status).toBe(404);
         expect((await prisma.testInvite.findUnique({ where: { id: fx.a.invite.id } }))?.isActive).toBe(false);
@@ -143,9 +143,9 @@ describe('DB-02: soft-deleted student and re-creation', () => {
 
     test('delete the student, re-create them with the same email, and invite the new record (201, submits)', async () => {
         const oldToken = fx.a.invite.token;
-        expect((await api.delete(`/api/students/${fx.a.student.id}`, fx.a.adminToken)).status).toBe(200);
+        expect((await api.delete(`/api/v1/students/${fx.a.student.id}`, fx.a.adminToken)).status).toBe(200);
 
-        const created = await api.post('/api/students/AddStudent', fx.a.adminToken).send({
+        const created = await api.post('/api/v1/students/AddStudent', fx.a.adminToken).send({
             name: 'Returning student',
             email: fx.a.student.email,
         });
@@ -179,7 +179,7 @@ describe('DB-02: tenant isolation is preserved on re-invite', () => {
     });
 
     test('a revoked B invite is not reissued by admin of A (404), and B stays revoked', async () => {
-        await api.delete(`/api/invites/${fx.b.invite.id}`, fx.b.adminToken);
+        await api.delete(`/api/v1/invites/${fx.b.invite.id}`, fx.b.adminToken);
         const res = await inviteStudent(fx.a.test.id, fx.b.student.id);
         expect(res.status).toBe(404);
         expect((await prisma.testInvite.findUnique({ where: { id: fx.b.invite.id } }))?.isActive).toBe(false);

@@ -11,7 +11,7 @@ const router = Router();
 // Create
 /**
  * @swagger
- * /api/v1/:
+ * /api/v1/institutes:
  *   post:
  *     summary: Create resource (/)
  *     description: Institutes API endpoint.
@@ -54,7 +54,7 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.c
 // Read
 /**
  * @swagger
- * /api/institutes:
+ * /api/v1/institutes:
  *   get:
  *     summary: Get all institutes
  *     description: Fetch all active institutes with optional pagination.
@@ -102,7 +102,7 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.c
 router.get('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.getAllInstitutes);
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/institutes/{id}:
  *   get:
  *     summary: Retrieve resource (/:id)
  *     description: Institutes API endpoint.
@@ -143,7 +143,7 @@ router.get('/:id', authenticateJWT, authorizeRoles('ADMIN'), instituteController
 // Update
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/institutes/{id}:
  *   put:
  *     summary: Update resource (/:id)
  *     description: Institutes API endpoint.
@@ -194,7 +194,7 @@ router.put('/:id', authenticateJWT, authorizeRoles('ADMIN'), instituteController
 // Soft delete
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/institutes/{id}:
  *   delete:
  *     summary: Delete resource (/:id)
  *     description: Institutes API endpoint.

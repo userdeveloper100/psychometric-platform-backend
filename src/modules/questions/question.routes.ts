@@ -7,7 +7,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/questions:
+ * /api/v1/questions:
  *   get:
  *     summary: Get all questions
  *     description: Fetch all active questions with optional pagination.
@@ -42,7 +42,7 @@ router.get(
 // Logged-in users can view questions
 /**
  * @swagger
- * /api/v1/dimensions/{dimensionId}/questions:
+ * /api/v1/questions/dimensions/{dimensionId}/questions:
  *   get:
  *     summary: Retrieve resource (/dimensions/:dimensionId/questions)
  *     description: Questions API endpoint.
@@ -89,7 +89,7 @@ router.get(
 // ADMIN only create/delete
 /**
  * @swagger
- * /api/v1/dimensions/{dimensionId}/questions:
+ * /api/v1/questions/dimensions/{dimensionId}/questions:
  *   post:
  *     summary: Create resource (/dimensions/:dimensionId/questions)
  *     description: Questions API endpoint.
@@ -185,7 +185,7 @@ router.post(
  *         description: Internal server error
  */
 router.delete(
-    '/questions/:id',
+    '/:id',
     authenticateJWT,
     authorizeRoles('ADMIN'),
     questionController.deleteQuestion

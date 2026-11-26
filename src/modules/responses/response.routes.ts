@@ -7,7 +7,7 @@ const router = Router();
 
 /**
  * @swagger
- * /api/responses:
+ * /api/v1/responses:
  *   get:
  *     summary: Get all responses
  *     description: Fetch all active responses with optional pagination.
@@ -77,7 +77,7 @@ router.get('/', authenticateJWT, authorizeRoles('ADMIN'), responseController.get
  *       500:
  *         description: Internal server error
  */
-router.post('/responses/submit', authenticateJWT, responseController.submitResponses);
+router.post('/submit', authenticateJWT, responseController.submitResponses);
 /**
  * @swagger
  * /api/v1/responses/student/{studentId}:
@@ -119,7 +119,7 @@ router.post('/responses/submit', authenticateJWT, responseController.submitRespo
  *         description: Internal server error
  */
 router.get(
-    '/responses/student/:studentId',
+    '/student/:studentId',
     authenticateJWT,
     authorizeRoles('ADMIN'),
     responseController.getStudentResponses
@@ -164,7 +164,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.get('/responses/test/:testId', authenticateJWT, authorizeRoles('ADMIN'), responseController.getTestResponses);
+router.get('/test/:testId', authenticateJWT, authorizeRoles('ADMIN'), responseController.getTestResponses);
 
 /**
  * @swagger
@@ -193,6 +193,6 @@ router.get('/responses/test/:testId', authenticateJWT, authorizeRoles('ADMIN'), 
  *       500:
  *         description: Internal server error
  */
-router.delete('/responses/:id', authenticateJWT, authorizeRoles('ADMIN'), responseController.deleteResponse);
+router.delete('/:id', authenticateJWT, authorizeRoles('ADMIN'), responseController.deleteResponse);
 
 export default router;

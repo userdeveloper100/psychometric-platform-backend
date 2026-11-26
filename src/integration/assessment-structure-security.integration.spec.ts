@@ -26,10 +26,10 @@ const dimensionRow = (id: string) => prisma.dimension.findUnique({ where: { id }
 const questionRow = (id: string) => prisma.question.findUnique({ where: { id } });
 const ids = (res: { body: { data: { id: string }[] } }) => res.body.data.map((row) => row.id);
 
-const createDimensionPath = (testId: string) => `/api/dimensions/tests/${testId}/dimensions`;
-const deleteDimensionPath = (id: string) => `/api/dimensions/dimensions/${id}`;
-const createQuestionPath = (dimensionId: string) => `/api/questions/dimensions/${dimensionId}/questions`;
-const deleteQuestionPath = (id: string) => `/api/questions/questions/${id}`;
+const createDimensionPath = (testId: string) => `/api/v1/dimensions/tests/${testId}/dimensions`;
+const deleteDimensionPath = (id: string) => `/api/v1/dimensions/${id}`;
+const createQuestionPath = (dimensionId: string) => `/api/v1/questions/dimensions/${dimensionId}/questions`;
+const deleteQuestionPath = (id: string) => `/api/v1/questions/${id}`;
 
 describe('SEC-06: role authorization (STUDENT is refused with 403 on writes)', () => {
     test('a STUDENT cannot create a dimension (403) and none is created', async () => {
@@ -68,11 +68,11 @@ describe('SEC-06: unauthenticated requests are refused with 401', () => {
         const responses = [
             await api.post(createDimensionPath(fx.a.test.id)).send({ name: 'x', description: 'x' }),
             await api.get(createDimensionPath(fx.a.test.id)),
-            await api.get('/api/dimensions'),
+            await api.get('/api/v1/dimensions'),
             await api.delete(deleteDimensionPath(fx.a.dimension.id)),
             await api.post(createQuestionPath(fx.a.dimension.id)).send({ text: 'x', scaleMin: 1, scaleMax: 5 }),
             await api.get(createQuestionPath(fx.a.dimension.id)),
-            await api.get('/api/questions'),
+            await api.get('/api/v1/questions'),
             await api.delete(deleteQuestionPath(fx.a.question.id)),
         ];
         for (const res of responses) {
@@ -201,22 +201,22 @@ describe('SEC-06: reads are limited to the caller institute', () => {
     });
 
     test('the global dimension list returns only institute A dimensions', async () => {
-        const res = await api.get('/api/dimensions', fx.a.adminToken);
+        const res = await api.get('/api/v1/dimensions', fx.a.adminToken);
         expect(res.status).toBe(200);
         expect(ids(res)).toEqual([fx.a.dimension.id]);
         expect(bodyText(res)).not.toContain(fx.b.dimension.id);
     });
 
     test('the global question list returns only institute A questions', async () => {
-        const res = await api.get('/api/questions', fx.a.adminToken);
+        const res = await api.get('/api/v1/questions', fx.a.adminToken);
         expect(res.status).toBe(200);
         expect(ids(res)).toEqual([fx.a.question.id]);
         expect(bodyText(res)).not.toContain(fx.b.question.id);
     });
 
     test('a query instituteId does not widen the global lists beyond institute A', async () => {
-        const dims = await api.get(`/api/dimensions?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
-        const qs = await api.get(`/api/questions?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
+        const dims = await api.get(`/api/v1/dimensions?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
+        const qs = await api.get(`/api/v1/questions?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
         expect(ids(dims)).toEqual([fx.a.dimension.id]);
         expect(ids(qs)).toEqual([fx.a.question.id]);
     });
@@ -229,7 +229,7 @@ describe('SEC-06: a token without an institute fails closed', () => {
     test('writes and reads are refused and B structure is not touched', async () => {
         const create = await api.post(createDimensionPath(fx.b.test.id), noInstituteToken()).send({ name: 'x', description: 'x' });
         const remove = await api.delete(deleteDimensionPath(fx.b.dimension.id), noInstituteToken());
-        const list = await api.get('/api/dimensions', noInstituteToken());
+        const list = await api.get('/api/v1/dimensions', noInstituteToken());
         expect(DENIED_STATUSES).toContain(create.status);
         expect(DENIED_STATUSES).toContain(remove.status);
         expect(list.status).toBe(403);

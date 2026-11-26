@@ -16,7 +16,7 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-const SUBMIT = '/api/responses/responses/submit';
+const SUBMIT = '/api/v1/responses/submit';
 const submit = (body: Record<string, unknown>, token = fx.a.studentToken) => api.post(SUBMIT, token).send(body);
 const totalResponses = () => prisma.response.count();
 const inviteRow = (id: string) => prisma.testInvite.findUnique({ where: { id } });

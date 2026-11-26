@@ -20,16 +20,16 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-const testReport = (testId: string, token?: string) => api.get(`/api/reports/reports/test/${testId}`, token);
+const testReport = (testId: string, token?: string) => api.get(`/api/v1/reports/test/${testId}`, token);
 const studentReport = (studentId: string, testId: string, token?: string) =>
-    api.get(`/api/reports/reports/student/${studentId}/test/${testId}`, token);
+    api.get(`/api/v1/reports/student/${studentId}/test/${testId}`, token);
 const studentIds = (res: { body: { data: { students: { studentId: string }[] } } }) =>
     res.body.data.students.map((s) => s.studentId);
 
 describe('SEC-10: role authorization (STUDENT is refused with 403, no token is refused with 401)', () => {
     test('a STUDENT cannot list reports, read a test report or read a student report (403)', async () => {
         const responses = [
-            await api.get('/api/reports', fx.a.studentToken),
+            await api.get('/api/v1/reports', fx.a.studentToken),
             await testReport(fx.a.test.id, fx.a.studentToken),
             await studentReport(fx.a.student.id, fx.a.test.id, fx.a.studentToken),
         ];
@@ -40,7 +40,7 @@ describe('SEC-10: role authorization (STUDENT is refused with 403, no token is r
 
     test('no token gets 401 on the list, the test report and the student report', async () => {
         const responses = [
-            await api.get('/api/reports'),
+            await api.get('/api/v1/reports'),
             await testReport(fx.a.test.id),
             await studentReport(fx.a.student.id, fx.a.test.id),
         ];
@@ -81,7 +81,7 @@ describe('SEC-10: accurate, scoped report data for own institute', () => {
     });
 
     test('the list of reports contains only institute A tests', async () => {
-        const res = await api.get('/api/reports', fx.a.adminToken);
+        const res = await api.get('/api/v1/reports', fx.a.adminToken);
         expect(res.status).toBe(200);
         expect(res.body.data.map((row: { id: string }) => row.id)).toEqual([fx.a.test.id]);
         expect(bodyText(res)).not.toContain(fx.b.test.id);
@@ -137,7 +137,7 @@ describe('SEC-10: inactive records never leak into reports', () => {
         expect((await testReport(fx.a.test.id, fx.a.adminToken)).status).toBe(404);
         expect((await studentReport(fx.a.student.id, fx.a.test.id, fx.a.adminToken)).status).toBe(404);
 
-        const list = await api.get('/api/reports', fx.a.adminToken);
+        const list = await api.get('/api/v1/reports', fx.a.adminToken);
         expect(list.body.data).toEqual([]);
     });
 
@@ -164,19 +164,19 @@ describe('SEC-10: inactive records never leak into reports', () => {
 describe('SEC-10: spoofed instituteId cannot override req.user.instituteId', () => {
     test('a query instituteId on a B test report does not grant access (404)', async () => {
         const res = await api
-            .get(`/api/reports/reports/test/${fx.b.test.id}?instituteId=${fx.a.institute.id}`, fx.a.adminToken);
+            .get(`/api/v1/reports/test/${fx.b.test.id}?instituteId=${fx.a.institute.id}`, fx.a.adminToken);
         expect(res.status).toBe(404);
     });
 
     test('a body instituteId on a B student report does not grant access (404)', async () => {
         const res = await api
-            .get(`/api/reports/reports/student/${fx.b.student.id}/test/${fx.b.test.id}`, fx.a.adminToken)
+            .get(`/api/v1/reports/student/${fx.b.student.id}/test/${fx.b.test.id}`, fx.a.adminToken)
             .send({ instituteId: fx.a.institute.id });
         expect(res.status).toBe(404);
     });
 
     test('a query instituteId on the list does not widen the scope beyond institute A', async () => {
-        const res = await api.get(`/api/reports?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
+        const res = await api.get(`/api/v1/reports?instituteId=${fx.b.institute.id}`, fx.a.adminToken);
         expect(res.body.data.map((row: { id: string }) => row.id)).toEqual([fx.a.test.id]);
     });
 });
@@ -186,7 +186,7 @@ describe('SEC-10: a token without an institute fails closed', () => {
     const noInstituteToken = () => generateToken({ userId: fx.a.admin.id, role: 'ADMIN', instituteId: '' });
 
     test('the list, the test report and the student report are refused with 403', async () => {
-        const list = await api.get('/api/reports', noInstituteToken());
+        const list = await api.get('/api/v1/reports', noInstituteToken());
         const test = await testReport(fx.b.test.id, noInstituteToken());
         const student = await studentReport(fx.b.student.id, fx.b.test.id, noInstituteToken());
         expect(list.status).toBe(403);

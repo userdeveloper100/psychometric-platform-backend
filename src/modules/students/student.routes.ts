@@ -9,13 +9,13 @@ const router = Router();
 
 
 /**
- * @route   GET /api/students?page=1&limit=10&search=
+ * @route   GET /api/v1/students?page=1&limit=10&search=
  * @desc    Get all active students (paginated)
  * @access  Private
  */
 /**
  * @swagger
- * /api/students:
+ * /api/v1/students:
  *   get:
  *     summary: Get all students
  *     description: Fetch all active students with optional pagination.
@@ -69,7 +69,7 @@ router.get(
 
 /**
  * @swagger
- * /api/students/AddStudent:
+ * /api/v1/students/AddStudent:
  *   post:
  *     summary: Create a new student
  *     tags: [Students]
@@ -99,7 +99,7 @@ router.get(
  */
 /**
  * @swagger
- * /api/v1/:
+ * /api/v1/students/AddStudent:
  *   post:
  *     summary: Create resource (/)
  *     description: Students API endpoint.
@@ -149,13 +149,13 @@ router.post(
 );
 
 /**
- * @route   POST /api/students/bulk-upload
+ * @route   POST /api/v1/students/bulk-upload
  * @desc    Bulk upload students from array (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/bulk-upload:
+ * /api/v1/students/bulk-upload:
  *   post:
  *     summary: Create resource (/bulk-upload)
  *     description: Students API endpoint.
@@ -204,13 +204,13 @@ router.post(
 
 
 /**
- * @route   DELETE /api/students/:id
+ * @route   DELETE /api/v1/students/:id
  * @desc    Soft delete a student (ADMIN only)
  * @access  Private
  */
 /**
  * @swagger
- * /api/v1/{id}:
+ * /api/v1/students/{id}:
  *   delete:
  *     summary: Delete resource (/:id)
  *     description: Students API endpoint.
