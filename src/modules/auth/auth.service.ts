@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { Prisma, Role } from '@prisma/client';
 import { generateToken } from '../../utils/jwt';
 import { generateInviteToken, hashInviteToken } from '../../utils/invite-token';
+import { dispatchInviteNotification } from '../notifications/notification.queue';
 
 
 interface LoginInput {
@@ -68,6 +69,15 @@ export async function createUserInvite({ email, role, expiresAt, instituteId, cr
             createdBy,
         },
         select: { id: true, email: true, role: true, expiresAt: true },
+    });
+
+    // Queued after the create. dispatch never throws, so the invite response is unaffected.
+    await dispatchInviteNotification({
+        type: 'SEND_USER_INVITE',
+        inviteId: invite.id,
+        instituteId,
+        recipientEmail: invite.email,
+        inviteToken: token,
     });
 
     return { invite, token };

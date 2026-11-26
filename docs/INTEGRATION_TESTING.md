@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-26 (scoring engine):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) and invitation-only onboarding (DEC-02) and the SaaS role hierarchy (DEC-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
+**Status as of 2026-11-26 (async notification queue):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) and invitation-only onboarding (DEC-02) and the SaaS role hierarchy (DEC-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -158,15 +158,15 @@ Run on 2026-11-26 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 31 suites) | 31 of 31 suites, **451 of 451 tests passed** |
-| `npm run test:integration` | 17 of 17 suites, **314 of 314 tests passed** |
+| `npm test` (unit, 35 suites) | 35 of 35 suites, **508 of 508 tests passed** |
+| `npm run test:integration` | 18 of 18 suites, **327 of 327 tests passed** |
 | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (314)
+### 7.1 Passing integration tests (327)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -324,6 +324,17 @@ The pure calculations live in `src/modules/reports/scoring.engine.ts`, with no d
 
 **Export.** `GET /api/v1/reports/test/{testId}/export?format=csv` returns `text/csv` with `Content-Disposition: attachment`. It is the same scoped report as the JSON route. Cells that start with `= + - @`, a tab or a carriage return get an apostrophe, so a spreadsheet cannot run them. Values with a comma, a quote or a line break are quoted (RFC 4180). The export is logged as `sensitive_admin_action` with the test id. The names are not logged.
 
+### 8.9 Async notification queue
+
+Invite emails are sent by a worker, not in the request. The module is `src/modules/notifications/`.
+
+- **Jobs.** `SEND_TEST_INVITE` is queued when an ADMIN or RECRUITER creates or re-issues a candidate `TestInvite`. `SEND_USER_INVITE` is queued when an ADMIN issues a staff `UserInvite`, and when a SUPER_ADMIN provisions an institute with `initialAdminEmail`. Each job is queued after its transaction has committed. A queue failure is logged with a short code and never changes the HTTP response.
+- **Storage.** Jobs go to Redis through the existing `redis` client: a pending list, an in-flight list, a sorted set of delayed retries, and a dead-letter list, all under `notifications:`. Without Redis, or in `NODE_ENV=test`, jobs go to an in-process memory queue.
+- **Zero-secret payload.** A job holds only `jobId`, `type`, `inviteId`, `instituteId`, `recipientEmail`, `attempt`, `maxAttempts` and `enqueuedAt`. The raw token is held in process memory, keyed by `jobId`, and released when the job completes or dead-letters. A guard rejects any job that holds a token-shaped value or a secret-named field. Logs carry the safe fields and a reason code, never the token or the recipient address.
+- **Retry and dead-letter.** A job gets up to 3 attempts. The wait after a failed attempt is 1 second, then 2 seconds (doubling, capped at 60 seconds). After the last failed attempt the job moves to the dead-letter list with its reason code.
+- **Test transport.** In `NODE_ENV=test` the mail transport is `MemoryMailTransport`, which records each message. Tests read the queue with `memoryQueueSnapshot()` and the delivered messages from the transport.
+- **Coverage.** `notifications.integration.spec.ts` (13 tests) covers the enqueue for each flow, the tenant scope, the re-issue, the absence of the token in the job and the logs, the worker delivering to the recipient, and the refused or revoked cases that enqueue nothing. Unit tests cover the payload guard, the queue adapters, the Redis fallback, the retry timing, dead-letter and the loop.
+
 ---
 
 ## 9. Known Limitations
@@ -336,6 +347,10 @@ The pure calculations live in `src/modules/reports/scoring.engine.ts`, with no d
 - **First SUPER_ADMIN is not created by any API.** `POST /api/v1/institutes` (DEC-01) provisions tenants, but the platform's first SUPER_ADMIN account is created outside the API. Tests create it with Prisma in `harness.ts`. How production creates it is an open decision.
 - **No dimension weights.** `Dimension` has no weight column, so the composite is equal-weighted. Adding weights needs a schema decision. Until then the weighted formula is only available to code that calls `weightedComposite` directly.
 - **Cohorts are per test and institute.** A percentile is not compared with other institutes or with published norms, by design (tenant isolation).
+- **No mail provider is wired.** No SMTP library is installed and `env.ts` has no mail settings. Outside tests the default transport refuses to send, so every invite job retries and dead-letters with `mail_transport_not_configured`. A real transport needs a dependency decision (for example nodemailer or a provider SDK) and its settings.
+- **The raw token stays in one process.** The secret vault is process memory. A worker in another process cannot send the token, so it dead-letters the job as `secret_unavailable`. Multi-process delivery needs an encrypted secret store, or a re-issue path.
+- **In-flight jobs are not recovered.** A job claimed by a worker that crashes stays in the in-flight list, and nothing requeues it yet. A visibility timeout is needed.
+- **Memory fallback is not durable.** Jobs queued in memory while Redis is down are lost on restart.
 - **No load or timing tests.** Report performance (N+1 queries) is not measured.
 - **Swagger is not tested.** Path drift is documented in `API_IMPLEMENTATION_MATRIX.md` but not asserted.
 - **Console noise.** The app logs every request's business events and error details to the console during tests.

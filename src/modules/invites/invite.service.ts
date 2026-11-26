@@ -3,6 +3,7 @@ import { InviteStatus, Prisma } from '@prisma/client';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 import { findUsableInvite } from './invite-validation';
+import { dispatchInviteNotification } from '../notifications/notification.queue';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -173,6 +174,9 @@ export async function inviteStudents(
             }
         });
 
+        // Queued after the transaction. A queue failure never changes this response.
+        await queueTestInviteNotifications(created, instituteId);
+
         logger.info('Students invited', {
             testId,
             created: created.length,
@@ -187,6 +191,39 @@ export async function inviteStudents(
         });
         if (error instanceof Error) throw error;
         throw new Error('Failed to invite students');
+    }
+}
+
+/**
+ * Queues one SEND_TEST_INVITE job per issued invite. Called after the transaction has committed. Never throws:
+ * a lookup or queue failure is logged, and the admin's 201 response is unchanged.
+ */
+async function queueTestInviteNotifications(
+    invites: { id: string; studentId: string; token: string }[],
+    instituteId: string
+): Promise<void> {
+    try {
+        const students = await prisma.student.findMany({
+            where: { id: { in: invites.map((invite) => invite.studentId) }, instituteId, isActive: true },
+            select: { id: true, email: true }
+        });
+        const emailByStudent = new Map(students.map((student) => [student.id, student.email]));
+
+        for (const invite of invites) {
+            const recipientEmail = emailByStudent.get(invite.studentId);
+            if (!recipientEmail) continue;
+            await dispatchInviteNotification({
+                type: 'SEND_TEST_INVITE',
+                inviteId: invite.id,
+                instituteId,
+                recipientEmail,
+                inviteToken: invite.token
+            });
+        }
+    } catch (error) {
+        logger.error('Failed to queue test invite notifications', {
+            error: error instanceof Error ? error.name : 'unknown'
+        });
     }
 }
 

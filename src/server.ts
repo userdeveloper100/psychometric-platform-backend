@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import app from "./app";
 import prisma from "./config/prisma";
 import { connectRedis, disconnectRedis } from "./config/redis";
+import { startNotificationWorker, stopNotificationWorker } from "./modules/notifications/notification.worker";
 
 const PORT = env.PORT;
 
@@ -14,6 +15,9 @@ const startServer = async () => {
         // degrade to no-ops).
         await connectRedis();
 
+        // Delivers queued invite emails. It uses Redis when connected and the in-process queue otherwise.
+        startNotificationWorker();
+
         const server = app.listen(PORT, () => {
             console.log(`Server running on http://localhost:${PORT}`);
             console.log(`Swagger docs at http://localhost:${PORT}/api-docs`);
@@ -22,6 +26,7 @@ const startServer = async () => {
         const shutdown = async (signal: string) => {
             console.log(`${signal} received — shutting down gracefully`);
             server.close();
+            stopNotificationWorker();
             await disconnectRedis();
             await prisma.$disconnect();
             process.exit(0);

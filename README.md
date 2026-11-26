@@ -953,6 +953,7 @@ Tracker for the enterprise recruiting modules that sit on top of the completed d
 
 | Module | Status | What it does | Commit |
 |---|---|---|---|
+| Async Notification & Redis Job Queue | `DONE` | Invite emails are queued after the invite transaction commits, never in the request. `SEND_TEST_INVITE` covers a candidate TestInvite created or re-issued. `SEND_USER_INVITE` covers a staff UserInvite and `initialAdminEmail` provisioning. Jobs are stored in Redis (`notifications:*` list and sorted set) through the existing client, with an in-process memory queue for tests and when Redis is down. A job holds only safe metadata, and the raw token stays in process memory until the job completes or dead-letters. It is never written to Redis or a log. Failed sends retry up to 3 times with 1s and 2s backoff, then dead-letter with a reason code. Enqueue failures are logged and never change the HTTP response. No mail provider is installed yet, so outside tests the default transport refuses to send (see the limitations in `docs/INTEGRATION_TESTING.md`). | `feat: add async notification queue with redis worker` |
 | Psychometric Scoring & Analytics Engine | `DONE` | Pure, deterministic scoring in `src/modules/reports/scoring.engine.ts`. Each dimension gets a normalized 0..100 score from its questions' own scales. A composite is the weighted mean of those scores. Each completed candidate gets a midrank percentile and a band (LOW, BELOW_AVERAGE, AVERAGE, ABOVE_AVERAGE, HIGH) against the completed candidates of the same test and institute only. The test report adds cohort statistics (count, mean, median, population standard deviation, min, max) and per-dimension averages. New `GET /api/v1/reports/test/{testId}/export?format=csv` returns a CSV with RFC 4180 quoting and formula-injection protection, for ADMIN, RECRUITER and EVALUATOR of the own institute. The schema has no dimension weight, so the composite is equal-weighted, and the schema is unchanged. | `feat: add psychometric scoring engine and csv report export` |
 
 **Formulas.** Normalized answer = (answer − scaleMin) / (scaleMax − scaleMin) × 100, clamped to 0..100. A scale with no range gives no score, never NaN. Composite = Σ(wᵢ·sᵢ) / Σwᵢ, which is the plain mean when no weights are set. Percentile = (below + 0.5 × equal) / n × 100. Bands: below 20 LOW, 20 to 40 BELOW_AVERAGE, 40 to 60 AVERAGE, 60 to 80 ABOVE_AVERAGE, 80 and up HIGH. Population standard deviation (divide by n).
@@ -965,8 +966,8 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 31 of 31 suites, **451 of 451 tests passed** |
-| Integration (active) | `npm run test:integration` | 17 of 17 suites, **314 of 314 tests passed** |
+| Unit | `npm test` | 35 of 35 suites, **508 of 508 tests passed** |
+| Integration (active) | `npm run test:integration` | 18 of 18 suites, **327 of 327 tests passed** |
 | Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03, DEC-01, DEC-02, DEC-03 and DEC-04 needed none |
 
 ---

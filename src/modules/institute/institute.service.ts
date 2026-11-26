@@ -2,6 +2,7 @@ import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
 import { softDeleteAudit } from '../../utils/softDelete';
 import { generateInviteToken, hashInviteToken } from '../../utils/invite-token';
+import { dispatchInviteNotification } from '../notifications/notification.queue';
 
 interface CreateInstituteInput {
     name: string;
@@ -48,8 +49,9 @@ export async function createInstitute({ name, email, initialAdminEmail, createdB
     const token = initialAdminEmail ? generateInviteToken() : null;
     const now = new Date();
 
+    let created;
     try {
-        return await prisma.$transaction(async (tx) => {
+        created = await prisma.$transaction(async (tx) => {
             const institute = await tx.institute.create({
                 data: {
                     name,
@@ -97,6 +99,19 @@ export async function createInstitute({ name, email, initialAdminEmail, createdB
         }
         throw new Error('Failed to create institute');
     }
+
+    // Queued only after the transaction has committed. dispatch never throws, so the 201 is unaffected.
+    if (created.initialAdminInvite) {
+        await dispatchInviteNotification({
+            type: 'SEND_USER_INVITE',
+            inviteId: created.initialAdminInvite.invite.id,
+            instituteId: created.id,
+            recipientEmail: initialAdminEmail!,
+            inviteToken: created.initialAdminInvite.token,
+        });
+    }
+
+    return created;
 }
 
 // ─── Get All Institutes (Paginated) ──────────────────────────────────────────
