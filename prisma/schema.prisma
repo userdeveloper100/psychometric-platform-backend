@@ -12,9 +12,10 @@ model Institute {
   name  String
   email String
 
-  users    User[]
-  students Student[]
-  tests    PsychometricTest[]
+  users       User[]
+  students    Student[]
+  tests       PsychometricTest[]
+  userInvites UserInvite[]
 
   createdBy String?
   createdAt DateTime @default(now())
@@ -163,6 +164,28 @@ model Response {
 
   @@index([studentId])
   @@index([questionId])
+}
+
+// DEC-02: an invitation for a staff or tenant user to create their own account. Only the SHA-256 hash of the
+// token is stored. The raw token is returned once, at creation, and is never stored or logged.
+model UserInvite {
+  id         String    @id @default(uuid())
+  email      String
+  role       Role
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  instituteId String
+  institute   Institute @relation(fields: [instituteId], references: [id])
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+
+  @@index([instituteId])
 }
 
 enum Role {

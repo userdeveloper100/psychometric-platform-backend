@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-26 (DEC-03):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
+**Status as of 2026-11-26 (DEC-02):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) and invitation-only onboarding (DEC-02) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -158,15 +158,15 @@ Run on 2026-11-26 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 28 suites) | 28 of 28 suites, **352 of 352 tests passed** |
-| `npm run test:integration` | 14 of 14 suites, **256 of 256 tests passed** |
+| `npm test` (unit, 29 suites) | 29 of 29 suites, **378 of 378 tests passed** |
+| `npm run test:integration` | 15 of 15 suites, **277 of 277 tests passed** |
 | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (256)
+### 7.1 Passing integration tests (277)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -191,6 +191,8 @@ Run on 2026-11-26 against `psychometric_test`:
 **`response-integrity.integration.spec.ts` (17):** DB-03 regression tests. A valid submission creates responses for the invite's student and marks the invite COMPLETED in one transaction (201). Extra body values (`instituteId`, `testId`, a different `studentId`) do not move a response: the invite decides, and a mismatched `studentId` is refused (400). A question from another test of the same institute, from a test of another institute, a deactivated question, a question under an inactive dimension, and a question of an inactive test are each refused (400) with zero rows written and the invite still open. A payload that mixes a valid and a foreign question writes nothing. Duplicate `questionId` entries, an empty array, a non-array `responses`, a string or fractional answer, and an out-of-scale answer are refused (400) with zero rows. A re-submission for a completed invite is refused (400). Two concurrent submissions for one invite produce exactly one 201 and one 400, with one stored row. A deactivated student's invite is refused with the generic message, and the token is not echoed.
 
 **`release-gate.integration.spec.ts` (15):** Step 12 regression tests. `GET /api/v1/tests` returns only the requester's institute, and a query `instituteId` cannot widen it. A token with no institute gets 403. A STUDENT gets 403 on test create, publish and delete, and nothing changes. `GET /api/v1/auth/users` lists only the requester's institute users, is ADMIN-only (STUDENT 403, no token 401). The security log is checked end to end: an invalid token writes `auth_failed` and the token is not in any logged entry. A denied STUDENT writes `authorization_denied` with the route template. Publishing a test writes `sensitive_admin_action`. A foreign test writes a not-found-in-scope denial. A refused invite writes `invite_validation_failed` with the fixed reason, and neither the submitted token nor a valid invite token is logged.
+
+**`onboarding-invite.integration.spec.ts` (21):** DEC-02 regression tests. Public registration returns 403, creates nothing, and logs `authorization_denied`. An ADMIN issues an invite (201). The token is shown once and stored only as a hash. A STUDENT gets 403 and an anonymous caller gets 401. Listing and revoking are scoped to the institute, so Admin A cannot revoke Institute B's invite (404). An invite is accepted with the token in the body, creates the user in the invited institute and role, and cannot be reused. An unknown, expired, revoked, used, inactive-institute or existing-email invite gets the same 400. A token in the URL is not accepted.
 
 **`candidate-invite-flow.integration.spec.ts` (22):** DEC-03 regression tests. A candidate loads the assessment with the invite token alone (200, no JWT). The payload has the test, the active dimensions and the active questions, and no other tenant data or internal fields. Inactive dimensions and questions are excluded. An unknown, expired, revoked, completed, or inactive-parent token gets one generic 404 with no token in the body, and the refusal logs `invite_validation_failed` without the token. A candidate submits with the token and no JWT (201), then cannot reload or resubmit. A STUDENT JWT gets 403 on the test, dimension and question lists.
 
@@ -259,7 +261,7 @@ Security events are written by `src/utils/security-logger.ts` at warn level as `
 
 Status codes and response bodies do not change. The release-gate checks, with the result at this commit:
 
-1. **Protected routes.** Every write route requires `authenticateJWT` and `authorizeRoles('ADMIN')`. Public routes are register and login (rate limited). Routes that need no account are `POST /api/v1/invites/assessment` and `POST /api/v1/responses/submit`, both bound to the invite token (DEC-03). Every other route requires a JWT with the ADMIN role, except `GET /health` and the register and login routes. Fixed in this step: test create, publish and delete, and `GET /api/v1/auth/users`, now have a route-level ADMIN check. The service checks remain.
+1. **Protected routes.** Every write route requires `authenticateJWT` and `authorizeRoles('ADMIN')`. Public routes are login (rate limited), `POST /api/v1/auth/accept-invite` (token in the body, rate limited), and `POST /api/v1/auth/register`, which is always refused with 403 (DEC-02). Routes that need no account are `POST /api/v1/invites/assessment` and `POST /api/v1/responses/submit`, both bound to the invite token (DEC-03). Every other route requires a JWT with the ADMIN role, except `GET /health` and the login route. Fixed in this step: test create, publish and delete, and `GET /api/v1/auth/users`, now have a route-level ADMIN check. The service checks remain.
 2. **Tenant identity.** No route trusts a tenant from the query string, the path or the body. The one exception is `POST /api/v1/tests`, whose body `instituteId` must equal the token's institute (403 otherwise). Fixed in this step: `GET /api/v1/tests` and `GET /api/v1/auth/users` returned other institutes' data, and the `getInstituteTests` controller read the tenant from the query. All three are now scoped to `req.user.instituteId` and fail closed.
 3. **Tenant-owned lookups.** Every update and delete follows a tenant-scoped lookup. Lookups by id that remain are the login lookup by email (before authentication) and the requester's own institute. The unrouted `deleteUser` is now scoped. Known exception: the unrouted `getInstitutes` search is not scoped and must be removed or scoped before it is routed.
 4. **Logs and errors.** No logger call writes a token, a password, an Authorization header or a request body. The error middleware logs the error name, message and status. It logs the stack only outside production. In production a 500 returns `Internal Server Error`. Known: `src/server.ts` logs the startup database error object. It runs before any request, and it was not changed in this step.
@@ -278,6 +280,16 @@ The internal assessment reads are ADMIN-only, so a STUDENT token gets 403 on the
 
 Covered by `candidate-invite-flow.integration.spec.ts` and the unit tests for the invite service, the invite controller and the response service. The assessment payload is checked for inactive rows, other tenants and internal fields.
 
+### 8.6 DEC-02: invitation-only onboarding
+
+`POST /api/v1/auth/register` is closed. It returns 403 for every request, creates nothing, and logs `authorization_denied` without the body.
+
+An ADMIN issues a user invite with `POST /api/v1/auth/invites`. The institute comes from the verified token, and an `instituteId` in the body is ignored. The token is 256 random bits. Only its SHA-256 hash is stored, in `UserInvite.tokenHash`, and the raw token is returned once, in the creation response. `GET /api/v1/auth/invites` lists the institute's invites without tokens or hashes. `DELETE /api/v1/auth/invites/{id}` revokes a pending invite, and a foreign invite returns 404.
+
+`POST /api/v1/auth/accept-invite` is public and reads `token`, `name` and `password` from the body only. The invite is claimed with a conditional update, and the user is created in the same transaction. So an invite is single use, and a failed user write leaves the invite usable. Every unusable invite (unknown, expired, revoked, used, inactive institute, or an email that already has an account) returns the same 400 and logs `invite_validation_failed` without the token.
+
+Covered by `onboarding-invite.integration.spec.ts` and the unit tests in `auth.service.spec.ts` and `auth.controller.spec.ts`. The migration `20261126120000_add_user_invites` is additive. It adds only the `UserInvite` table. Apply it to the test database with `npm run test:db:setup`, and to `psychometric_db` with `npx prisma migrate deploy`.
+
 ---
 
 ## 9. Known Limitations
@@ -287,6 +299,7 @@ Covered by `candidate-invite-flow.integration.spec.ts` and the unit tests for th
 - **Sequential only.** `--runInBand` is required. Parallel runs would share one database.
 - **Single shared test database.** Suites are isolated by truncation, not by separate schemas.
 - **Student identity is not modelled as an account.** `Student` has no link to `User`, and DEC-03 identifies a candidate by the invite token instead. A test for "a student reads their own data" needs a new decision that adds an account link.
+- **No institute provisioning API.** Public registration is closed (DEC-02), so no endpoint creates an institute or its first ADMIN. Tests create them with Prisma in `harness.ts`. How production gets its first institute is an open decision.
 - **No load or timing tests.** Report performance (N+1 queries) is not measured.
 - **Swagger is not tested.** Path drift is documented in `API_IMPLEMENTATION_MATRIX.md` but not asserted.
 - **Console noise.** The app logs every request's business events and error details to the console during tests.

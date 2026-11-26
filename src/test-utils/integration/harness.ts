@@ -44,7 +44,7 @@ export const verifyConnectedTestDatabase = async (): Promise<void> => {
 export const resetTestDatabase = async (): Promise<void> => {
     await verifyConnectedTestDatabase();
     await prisma.$executeRawUnsafe(
-        'TRUNCATE TABLE "Response", "TestInvite", "Question", "Dimension", "Student", ' +
+        'TRUNCATE TABLE "Response", "TestInvite", "UserInvite", "Question", "Dimension", "Student", ' +
             '"PsychometricTest", "User", "Institute" RESTART IDENTITY CASCADE'
     );
 };
