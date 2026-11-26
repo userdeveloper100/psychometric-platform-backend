@@ -1,6 +1,7 @@
 import { InviteStatus } from '@prisma/client';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
+import { findUsableInvite } from '../invites/invite-validation';
 
 export interface SubmitResponseItem {
     questionId: string;
@@ -36,9 +37,6 @@ const requireInstitute = (instituteId: string | undefined): string => {
     return instituteId;
 };
 
-const isExpired = (expiresAt: Date | null, now: Date): boolean =>
-    expiresAt !== null && expiresAt.getTime() <= now.getTime();
-
 /**
  * DB-03: a submission is accepted only if it is bound to a valid invite. The invite decides the student,
  * the test and the institute. Body values for those are used only to check that they match, never to write.
@@ -66,35 +64,10 @@ export const submitResponses = async (data: SubmitResponsesInput, userId: string
         const now = new Date();
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1) The invite is the only source of truth for the student, the test and the institute.
-            const invite = await tx.testInvite.findFirst({
-                where: { token, isActive: true },
-                select: {
-                    id: true,
-                    testId: true,
-                    studentId: true,
-                    status: true,
-                    expiresAt: true,
-                    test: { select: { instituteId: true, isActive: true } },
-                    student: { select: { instituteId: true, isActive: true } }
-                }
-            });
-
-            // 2) Invite must exist and be pending and unexpired (SEC-05). Messages never include the token.
-            if (!invite) throw new Error('Invalid or inactive invite token');
-            if (invite.status !== InviteStatus.PENDING) {
-                throw new Error('Responses already submitted for this invite');
-            }
-            if (isExpired(invite.expiresAt, now)) throw new Error('Invite has expired');
-
-            // 3) A studentId in the body must match the invite. A mismatch is refused, never reassigned.
-            if (invite.studentId !== studentId) throw new Error('Student does not match invite');
-
-            // 4) The invited test and student must both be active and belong to the same institute.
-            const sameInstitute = invite.test.instituteId === invite.student.instituteId;
-            if (!invite.test.isActive || !invite.student.isActive || !sameInstitute) {
-                throw new Error('Invalid or inactive invite token');
-            }
+            // 1-4) The invite is the only source of truth for the student, the test and the institute. The shared
+            //      rules (SEC-05, DEC-03) check that it exists, is pending and unexpired, matches the body studentId,
+            //      and that the test, the student and the institute are all active. Messages never include the token.
+            const invite = await findUsableInvite(tx, token, now, studentId);
 
             // 5) Every question must be active, under an active dimension, of the invited test. A question from
             //    another test, another institute, or an inactive parent is missing from this result and refused.

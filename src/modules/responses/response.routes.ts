@@ -39,11 +39,9 @@ router.get('/', authenticateJWT, authorizeRoles('ADMIN'), responseController.get
  * @swagger
  * /api/v1/responses/submit:
  *   post:
- *     summary: Create resource (/responses/submit)
- *     description: Responses API endpoint.
+ *     summary: Submit responses with an invite token (DEC-03)
+ *     description: Public. The body token is the only credential. The token decides the student, the test and the institute. Each submission is accepted once.
  *     tags: [Responses]
- *     security:
- *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -77,7 +75,8 @@ router.get('/', authenticateJWT, authorizeRoles('ADMIN'), responseController.get
  *       500:
  *         description: Internal server error
  */
-router.post('/submit', authenticateJWT, responseController.submitResponses);
+// DEC-03: no JWT. The invite token in the body is the only credential, and the shared invite rules check it.
+router.post('/submit', responseController.submitResponses);
 /**
  * @swagger
  * /api/v1/responses/student/{studentId}:

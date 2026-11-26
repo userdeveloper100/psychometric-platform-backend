@@ -576,15 +576,15 @@ Every module is served under `/api/v1/<resource>` (`DEC-04`). The unversioned `/
 | Institutes | GET | `/api/v1/institutes` | ADMIN |
 | Institutes | GET, PUT, DELETE | `/api/v1/institutes/{id}` | ADMIN, own institute only |
 | Tests | POST | `/api/v1/tests` | ADMIN |
-| Tests | GET | `/api/v1/tests` | Any user, own institute |
+| Tests | GET | `/api/v1/tests` | ADMIN, own institute |
 | Tests | PATCH | `/api/v1/tests/{id}/publish` | ADMIN |
 | Tests | DELETE | `/api/v1/tests/{id}` | ADMIN |
-| Dimensions | GET | `/api/v1/dimensions` | Any user, own institute |
-| Dimensions | GET | `/api/v1/dimensions/tests/{testId}/dimensions` | Any user, own institute |
+| Dimensions | GET | `/api/v1/dimensions` | ADMIN, own institute |
+| Dimensions | GET | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN, own institute |
 | Dimensions | POST | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN |
 | Dimensions | DELETE | `/api/v1/dimensions/{id}` | ADMIN |
-| Questions | GET | `/api/v1/questions` | Any user, own institute |
-| Questions | GET | `/api/v1/questions/dimensions/{dimensionId}/questions` | Any user, own institute |
+| Questions | GET | `/api/v1/questions` | ADMIN, own institute |
+| Questions | GET | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN, own institute |
 | Questions | POST | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN |
 | Questions | DELETE | `/api/v1/questions/{id}` | ADMIN |
 | Students | GET | `/api/v1/students` | ADMIN |
@@ -596,8 +596,9 @@ Every module is served under `/api/v1/<resource>` (`DEC-04`). The unversioned `/
 | Invites | GET | `/api/v1/invites/tests/{testId}/invites` | ADMIN |
 | Invites | GET | `/api/v1/invites/students/{studentId}/invites` | ADMIN |
 | Invites | DELETE | `/api/v1/invites/{id}` | ADMIN |
+| Invites | POST | `/api/v1/invites/assessment` | Public, invite token in the body (DEC-03) |
 | Responses | GET | `/api/v1/responses` | ADMIN |
-| Responses | POST | `/api/v1/responses/submit` | Any authenticated user, bound to the invite token |
+| Responses | POST | `/api/v1/responses/submit` | Public, invite token in the body (DEC-03, no JWT) |
 | Responses | GET | `/api/v1/responses/student/{studentId}` | ADMIN |
 | Responses | GET | `/api/v1/responses/test/{testId}` | ADMIN |
 | Responses | DELETE | `/api/v1/responses/{id}` | ADMIN |
@@ -884,6 +885,7 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Task | Summary | Reference |
 |---|---|---|
+| `DEC-03` Token-bound Candidate Access via `TestInvite` | A candidate is identified by the invite token alone. `POST /api/v1/invites/assessment` takes the token in the body and returns the test title and description, the candidate's `studentId`, the active dimensions and the active questions. Inactive dimensions and questions are excluded, and no internal fields are returned. The endpoint applies the same rules as submission (`findUsableInvite` in `src/modules/invites/invite-validation.ts`): the invite must exist, be pending and unexpired, match the student, and have an active test, student and institute. Every refusal returns one generic 404 and logs `invite_validation_failed` without the token. `POST /api/v1/responses/submit` no longer requires a JWT; the invite token is the only credential, and the DB-03 and SEC-05 checks are unchanged. Internal assessment reads (`GET /api/v1/tests`, `GET /api/v1/dimensions`, `GET /api/v1/dimensions/tests/{testId}/dimensions`, `GET /api/v1/questions` and `GET /api/v1/questions/dimensions/{dimensionId}/questions`) are ADMIN only, so a STUDENT token gets 403. The schema has no link between `Student` and `User`, and none was added. | `feat: enforce token-bound candidate assessment flow` |
 | `DEC-04` Standardized `/api/v1` Routes & Duplicate Segment Cleanup | Every module router is mounted under `/api/v1/<resource>`. The unversioned `/api/...` paths return 404. The duplicated segments are removed: `/responses/responses/...`, `/reports/reports/...`, `/dimensions/dimensions/...` and `/questions/questions/...` are now `/responses/...`, `/reports/...`, `/dimensions/...` and `/questions/...`. Health moved to `GET /health` at the root. Swagger annotations show the real full paths. Authentication, role checks and tenant checks are unchanged. The full old-to-new table is in the API Versioning section | `feat: standardize api v1 routes and remove duplicate path segments` |
 | Backend Implementation Audit & Roadmap | Five audit documents in `docs/` | `94cc856` |
 | `SEC-11` Integration Test Infrastructure | Isolated `psychometric_test` database guard, fixtures, supertest harness | `9fa8803`, `docs/INTEGRATION_TESTING.md` |
@@ -903,16 +905,16 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Decision | Status |
 |---|---|
-| `DEC-01` Multi-tenant Enterprise Recruiting SaaS | `DECIDED — IMPLEMENTATION NEXT` |
-| `DEC-02` Invitation-only onboarding | `DECIDED — IMPLEMENTATION NEXT` |
-| `DEC-03` Token-bound candidates via `TestInvite` | `DECIDED — IMPLEMENTATION NEXT` |
+| `DEC-01` Multi-tenant Enterprise Recruiting SaaS | `DECIDED — NEXT` |
+| `DEC-02` Invitation-only onboarding | `DECIDED — NEXT` |
+| `DEC-03` Token-bound candidates via `TestInvite` | `DONE` (see Completed) |
 | `DEC-04` Standardized `/api/v1` routes | `DONE` (see Completed) |
 
-The three decided items are recorded here. Their behaviour changes are not implemented yet, so the current code still reflects the state before the decisions.
+DEC-03 and DEC-04 are implemented. DEC-01 and DEC-02 are recorded here, and their behaviour changes are not implemented yet.
 
 **Post-decision follow-ups** (not started; each depends on the decisions above or on a migration):
 
-- **DEC-03 (implementation next):** candidates are identified by their `TestInvite` token. Student self-service reports and linking a `Student` to a `User` follow from it. Until that is implemented, the student submission route stays token-bound only, and the dimension, question and test reads are scoped to the institute for any authenticated user.
+- **DEC-03 (done):** candidates are identified by their `TestInvite` token alone. Student self-service reports are not offered, and linking a `Student` to a `User` is not done; either needs its own decision. There is no `GET /api/v1/tests/{id}` route. A candidate reads their test through `POST /api/v1/invites/assessment`.
 - **Invite tokens at rest:** tokens are still stored in plaintext. Hashing needs a migration and a decision on how existing invites are handled.
 - **API documentation in production:** `/api-docs` is served whenever the app runs. Decide whether it is disabled in production.
 - **Unrouted code, not tenant scoped:** `getInstitutes` in `institute.service.ts` (search across all institutes) has no route. Its query is not scoped to the requester, so it must be removed or scoped before anyone routes it. This is the one known exception to the release-gate rule that tenant lookups are scoped.
@@ -923,9 +925,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 28 of 28 suites, **333 of 333 tests passed** |
-| Integration (active) | `npm run test:integration` | 13 of 13 suites, **234 of 234 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03 and DEC-04 needed none |
+| Unit | `npm test` | 28 of 28 suites, **352 of 352 tests passed** |
+| Integration (active) | `npm run test:integration` | 14 of 14 suites, **256 of 256 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03, DEC-03 and DEC-04 needed none |
 
 ---
 

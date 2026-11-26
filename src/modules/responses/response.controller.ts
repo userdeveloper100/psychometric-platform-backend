@@ -13,6 +13,7 @@ import {
     serverErrorResponse
 } from '../../utils/response-helpers';
 import { logSecurityEvent } from '../../utils/security-logger';
+import { INVITE_REFUSALS } from '../invites/invite-validation';
 
 const getUserId = (req: Request): string => {
     const user = (req as any).user;
@@ -59,14 +60,6 @@ const SUBMISSION_REFUSALS: readonly string[] = [
 
 const isSubmissionRefusal = (message: string): boolean =>
     SUBMISSION_REFUSALS.includes(message) || /^Answer for question .+ must be between /.test(message);
-
-/** Refusals about the invite itself, which are logged as security events (Step 12). The token is never logged. */
-const INVITE_REFUSALS: readonly string[] = [
-    'Invalid or inactive invite token',
-    'Responses already submitted for this invite',
-    'Invite has expired',
-    'Student does not match invite',
-];
 
 export const submitResponses = async (req: Request, res: Response): Promise<Response> => {
     try {

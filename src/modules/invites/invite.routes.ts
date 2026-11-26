@@ -258,4 +258,41 @@ router.delete(
     inviteController.deleteInvite
 );
 
+/**
+ * @route   POST /api/v1/invites/assessment
+ * @desc    Load the assessment for an invite token (DEC-03). No JWT. The token is in the body, not the URL,
+ *          so it is not written to URL logs or browser history.
+ * @access  Public (invite token)
+ */
+/**
+ * @swagger
+ * /api/v1/invites/assessment:
+ *   post:
+ *     summary: Load the candidate assessment (DEC-03)
+ *     description: Public. Returns the test, its active dimensions and active questions for a pending, unexpired invite. Every refusal is the same 404.
+ *     tags: [Invites]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 example: 3f9c0e2a7b1d4e8f9a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f
+ *     responses:
+ *       200:
+ *         description: Assessment fetched successfully
+ *       400:
+ *         description: token is required
+ *       404:
+ *         description: Assessment is not available for this invite (unknown, expired, revoked, completed, or an inactive parent)
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/assessment', inviteController.getCandidateAssessment);
+
 export default router;

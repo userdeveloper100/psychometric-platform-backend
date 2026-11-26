@@ -193,4 +193,54 @@ describe('invite.controller', () => {
             expect(statusCode(res)).toBe(200);
         });
     });
+
+    describe('getCandidateAssessment (DEC-03)', () => {
+        const TOKEN = 'candidate-token-value-1234567890';
+
+        test('200 with the assessment, and no JWT is read', async () => {
+            svc.getCandidateAssessment.mockResolvedValue({ studentId: 's1', test: { id: 't1' }, dimensions: [] } as any);
+            const req = mockRequest({ body: { token: TOKEN } });
+            const res = mockResponse();
+
+            await inviteController.getCandidateAssessment(req, res);
+
+            expect(statusCode(res)).toBe(200);
+            expect(svc.getCandidateAssessment).toHaveBeenCalledWith(TOKEN);
+            expect(jsonBody(res).data).toEqual({ studentId: 's1', test: { id: 't1' }, dimensions: [] });
+        });
+
+        test('400 when the token is missing or not a string, and the service is not called', async () => {
+            for (const body of [{}, { token: '' }, { token: 123 }]) {
+                const res = mockResponse();
+                await inviteController.getCandidateAssessment(mockRequest({ body }), res);
+                expect(statusCode(res)).toBe(400);
+            }
+            expect(svc.getCandidateAssessment).not.toHaveBeenCalled();
+        });
+
+        test.each([
+            'Invalid or inactive invite token',
+            'Responses already submitted for this invite',
+            'Invite has expired',
+            'Student does not match invite',
+        ])('404 with one generic message for the refusal "%s", without the token', async (message) => {
+            svc.getCandidateAssessment.mockRejectedValue(new Error(message));
+            const res = mockResponse();
+
+            await inviteController.getCandidateAssessment(mockRequest({ body: { token: TOKEN } }), res);
+
+            expect(statusCode(res)).toBe(404);
+            expect(jsonBody(res).message).toBe('Assessment is not available for this invite');
+            expect(JSON.stringify(jsonBody(res))).not.toContain(TOKEN);
+        });
+
+        test('500 on an unexpected failure', async () => {
+            svc.getCandidateAssessment.mockRejectedValue(new Error('database down'));
+            const res = mockResponse();
+
+            await inviteController.getCandidateAssessment(mockRequest({ body: { token: TOKEN } }), res);
+
+            expect(statusCode(res)).toBe(500);
+        });
+    });
 });

@@ -182,10 +182,10 @@ describe('SEC-06: admin of A cannot touch institute B structure (404, B untouche
 });
 
 describe('SEC-06: reads are limited to the caller institute', () => {
-    test('a STUDENT of institute A can read the dimensions of an A test (200)', async () => {
+    test('a STUDENT of institute A cannot read the dimensions of an A test (403, DEC-03)', async () => {
         const res = await api.get(createDimensionPath(fx.a.test.id), fx.a.studentToken);
-        expect(res.status).toBe(200);
-        expect(ids(res)).toEqual([fx.a.dimension.id]);
+        expect(res.status).toBe(403);
+        expect(bodyText(res)).not.toContain(fx.a.dimension.id);
     });
 
     test('a STUDENT of institute A cannot read the dimensions of a B test (404)', async () => {

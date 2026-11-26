@@ -55,14 +55,14 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.create
 /**
  * @route   GET /api/v1/tests?instituteId=...&page=1&limit=10&status=DRAFT|PUBLISHED&search=...
  * @desc    Get tests for an institute (paginated)
- * @access  Private/Public (based on your middleware setup)
+ * @access  Private (ADMIN only; candidates load assessments through POST /api/v1/invites/assessment)
  */
 /**
  * @swagger
  * /api/v1/tests:
  *   get:
  *     summary: Get all tests
- *     description: Fetch all active tests with optional pagination.
+ *     description: Fetch all active tests with optional pagination. ADMIN role required.
  *     tags: [Tests]
  *     parameters:
  *       - in: query
@@ -102,7 +102,7 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.create
  *       500:
  *         description: Internal server error
  */
-router.get('/', authenticateJWT, testController.getAllTests);
+router.get('/', authenticateJWT, authorizeRoles('ADMIN'), testController.getAllTests);
 
 /**
  * @route   PATCH /api/v1/tests/:id/publish

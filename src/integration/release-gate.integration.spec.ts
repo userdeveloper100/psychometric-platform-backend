@@ -37,10 +37,10 @@ describe('Gate: GET /api/v1/tests is limited to the requester institute', () => 
         expect(res.body.meta.pagination.total).toBe(1);
     });
 
-    test('a STUDENT of A reads only institute A tests (tenant-scoped read)', async () => {
+    test('a STUDENT cannot list tests, even of their own institute (403, DEC-03; candidates use the invite token)', async () => {
         const res = await api.get('/api/v1/tests', fx.a.studentToken);
-        expect(res.status).toBe(200);
-        expect(ids(res)).toEqual([fx.a.test.id]);
+        expect(res.status).toBe(403);
+        expect(bodyText(res)).not.toContain(fx.a.test.id);
     });
 
     test('a query instituteId cannot widen the list to institute B', async () => {

@@ -14,6 +14,7 @@ import {
     serverErrorResponse
 } from '../../utils/response-helpers';
 import { logSecurityEvent } from '../../utils/security-logger';
+import { INVITE_REFUSALS } from './invite-validation';
 
 // ─── Invite Students ──────────────────────────────────────────────────────────
 
@@ -236,5 +237,34 @@ export const deleteInvite = async (
             return conflictResponse(res, error.message);
         }
         return badRequestResponse(res, error.message || 'Failed to delete invite');
+    }
+};
+
+// ─── Candidate Assessment (DEC-03) ────────────────────────────────────────────
+
+/**
+ * DEC-03: no JWT is read here. Every refusal (unknown, expired, revoked, completed, or an inactive parent)
+ * returns the same 404, so a caller cannot tell the cases apart. The token is never logged, only the fixed reason.
+ */
+export const getCandidateAssessment = async (req: Request, res: Response) => {
+    try {
+        const { token } = req.body;
+
+        if (!token || typeof token !== 'string') {
+            return badRequestResponse(res, 'token is required');
+        }
+
+        const data = await inviteService.getCandidateAssessment(token);
+        return successResponse(res, data, 'Assessment fetched successfully');
+    } catch (error: any) {
+        if (INVITE_REFUSALS.includes(error.message)) {
+            logSecurityEvent('invite_validation_failed', {
+                action: 'load_assessment',
+                resourceType: 'invite',
+                reason: error.message,
+            });
+            return notFoundResponse(res, 'Assessment is not available for this invite');
+        }
+        return serverErrorResponse(res, error.message || 'Failed to load assessment');
     }
 };

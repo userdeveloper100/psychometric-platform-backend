@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-26 (DEC-04):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) and the standardized `/api/v1/v1` routes (DEC-04) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
+**Status as of 2026-11-26 (DEC-03):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -158,15 +158,15 @@ Run on 2026-11-26 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 28 suites) | 28 of 28 suites, **333 of 333 tests passed** |
-| `npm run test:integration` | 13 of 13 suites, **234 of 234 tests passed** |
+| `npm test` (unit, 28 suites) | 28 of 28 suites, **352 of 352 tests passed** |
+| `npm run test:integration` | 14 of 14 suites, **256 of 256 tests passed** |
 | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (234)
+### 7.1 Passing integration tests (256)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -182,7 +182,7 @@ Run on 2026-11-26 against `psychometric_test`:
 
 **`report-security.integration.spec.ts` (21):** SEC-10 regression tests, promoted from the pending suite once fixed, together with the report-parameter functional test. Every report route requires ADMIN: STUDENT gets 403, no token gets 401. The handlers read `:testId` and `:studentId` from the route, so valid requests return 200. The student report route returns one student, not the whole test. An ADMIN of A gets accurate scores from active responses (answer 3 gives score 3). A foreign or non-existent test or student returns the same 404. Inactive students, tests, dimensions, questions and responses are left out: an inactive student or test gets 404 on the single report, an inactive test drops out of the list, and a deactivated response or question does not count toward the score. Query and body `instituteId` values are ignored. A token without an institute fails closed with 403.
 
-**Report access policy.** All report routes are ADMIN-only. Student self-service reports are not offered, because `Student` is not linked to `User` (DEC-03 is still open), so a STUDENT token cannot be matched to a student record. Revisit this when DEC-03 is decided.
+**Report access policy.** All report routes are ADMIN-only. Student self-service reports are not offered. DEC-03 identifies a candidate by the invite token, not by an account, and `Student` is still not linked to `User`, so a STUDENT token cannot be matched to a student record. Linking the two would need its own decision.
 
 **`soft-delete-cascade.integration.spec.ts` (18):** DB-01 regression tests, including the own-institute delete that was previously pending. Deleting an own institute returns 200 and soft deletes every dependent row: tests, dimensions, questions, students, invites, responses and users. Each of these has `updatedBy` set to the acting user, never the institute id. Deleting an own test cascades to its dimensions, questions, invites and responses, and leaves the institute and the student active. Deleting an own dimension cascades to its questions and their responses. Deleting an own question cascades to its responses. Deleting an own student cascades to its invites and responses. Cross-tenant deletes return 404 and leave institute B untouched. Deleting the same test twice returns 404 and keeps the first `updatedBy`. No row is ever removed; each cascade sets `isActive` to false.
 
@@ -192,9 +192,11 @@ Run on 2026-11-26 against `psychometric_test`:
 
 **`release-gate.integration.spec.ts` (15):** Step 12 regression tests. `GET /api/v1/tests` returns only the requester's institute, and a query `instituteId` cannot widen it. A token with no institute gets 403. A STUDENT gets 403 on test create, publish and delete, and nothing changes. `GET /api/v1/auth/users` lists only the requester's institute users, is ADMIN-only (STUDENT 403, no token 401). The security log is checked end to end: an invalid token writes `auth_failed` and the token is not in any logged entry. A denied STUDENT writes `authorization_denied` with the route template. Publishing a test writes `sensitive_admin_action`. A foreign test writes a not-found-in-scope denial. A refused invite writes `invite_validation_failed` with the fixed reason, and neither the submitted token nor a valid invite token is logged.
 
+**`candidate-invite-flow.integration.spec.ts` (22):** DEC-03 regression tests. A candidate loads the assessment with the invite token alone (200, no JWT). The payload has the test, the active dimensions and the active questions, and no other tenant data or internal fields. Inactive dimensions and questions are excluded. An unknown, expired, revoked, completed, or inactive-parent token gets one generic 404 with no token in the body, and the refusal logs `invite_validation_failed` without the token. A candidate submits with the token and no JWT (201), then cannot reload or resubmit. A STUDENT JWT gets 403 on the test, dimension and question lists.
+
 **`api-versioning.integration.spec.ts` (19):** DEC-04 regression tests. Each module answers under `/api/v1/<resource>`: auth users, institute by id, the test list, the dimension and question reads, students, invites, responses (list, test read, submit, delete) and reports (test and student). The tenant and role rules still apply on the versioned paths (a STUDENT gets 403, a foreign test gets 404). `GET /health` is served at the root. The old unversioned `/api/v1/...` paths return 404 even with a valid admin token, `/api/v1/health` returns 404, and the duplicated `/responses/responses`, `/reports/reports`, `/dimensions/dimensions` and `/questions/questions` paths return 404. Those 404 requests change no rows.
 
-**Read policy for dimensions and questions.** Reads are not restricted to ADMIN. Any authenticated user may read the dimensions and questions of their own institute. A STUDENT of institute A can read an A test's dimensions (200), and a foreign test or dimension returns 404. The reason is that a STUDENT is not yet linked to a test (DEC-03), so an ADMIN-only read would remove the only read path students have. Writes stay ADMIN-only. There are no update (PUT) routes for dimensions or questions, so the update case in the brief has no route to test. None was added.
+**Read policy for dimensions and questions (DEC-03).** The test list, the dimension list, the per-test dimension list, the question list and the per-dimension question list are ADMIN-only. A STUDENT token gets 403 on each, and a foreign test or dimension returns 404 to an ADMIN. A candidate reads their assessment only through `POST /api/v1/invites/assessment`, with the invite token. Writes stay ADMIN-only. There are no update (PUT) routes for dimensions or questions, so the update case in the brief has no route to test. None was added.
 
 **`guards.integration.spec.ts` (21):** these are regression guards. They pass today and must keep passing. They are not evidence that an audit finding is fixed.
 
@@ -257,14 +259,24 @@ Security events are written by `src/utils/security-logger.ts` at warn level as `
 
 Status codes and response bodies do not change. The release-gate checks, with the result at this commit:
 
-1. **Protected routes.** Every write route requires `authenticateJWT` and `authorizeRoles('ADMIN')`. Public routes are register and login (rate limited). Routes that any authenticated user may call, by design and tenant scoped, are the dimension and question reads, `GET /api/v1/tests`, and `POST /api/v1/responses/responses/submit` (bound to the invite token, DEC-03 open). Fixed in this step: test create, publish and delete, and `GET /api/v1/auth/users`, now have a route-level ADMIN check. The service checks remain.
+1. **Protected routes.** Every write route requires `authenticateJWT` and `authorizeRoles('ADMIN')`. Public routes are register and login (rate limited). Routes that need no account are `POST /api/v1/invites/assessment` and `POST /api/v1/responses/submit`, both bound to the invite token (DEC-03). Every other route requires a JWT with the ADMIN role, except `GET /health` and the register and login routes. Fixed in this step: test create, publish and delete, and `GET /api/v1/auth/users`, now have a route-level ADMIN check. The service checks remain.
 2. **Tenant identity.** No route trusts a tenant from the query string, the path or the body. The one exception is `POST /api/v1/tests`, whose body `instituteId` must equal the token's institute (403 otherwise). Fixed in this step: `GET /api/v1/tests` and `GET /api/v1/auth/users` returned other institutes' data, and the `getInstituteTests` controller read the tenant from the query. All three are now scoped to `req.user.instituteId` and fail closed.
 3. **Tenant-owned lookups.** Every update and delete follows a tenant-scoped lookup. Lookups by id that remain are the login lookup by email (before authentication) and the requester's own institute. The unrouted `deleteUser` is now scoped. Known exception: the unrouted `getInstitutes` search is not scoped and must be removed or scoped before it is routed.
 4. **Logs and errors.** No logger call writes a token, a password, an Authorization header or a request body. The error middleware logs the error name, message and status. It logs the stack only outside production. In production a 500 returns `Internal Server Error`. Known: `src/server.ts` logs the startup database error object. It runs before any request, and it was not changed in this step.
 
-### 8.4 DEC-04: standardized /api/v1/v1 routes
+### 8.4 DEC-04: standardized /api/v1 routes
 
-Every module router is mounted once, under `/api/v1/v1`, in `src/app.ts`. The unversioned mount is removed, so `/api/v1/...` returns 404. The duplicated segments are removed inside the routers: `/responses/responses/...`, `/reports/reports/...`, `/dimensions/dimensions/...` and `/questions/questions/...` are now `/responses/...`, `/reports/...`, `/dimensions/...` and `/questions/...`. The full old-to-new table is in the README (API Versioning). Health moved to `GET /health` at the root. The Swagger annotations show the real full paths. `POST /api/v1/students/AddStudent` keeps its name, because it is not a duplicate, and renaming it is a separate decision. The audit and gap-analysis documents in `docs/` still describe the pre-DEC-04 paths, because they record the state when they were written.
+Every module router is mounted once, under `/api/v1`, in `src/app.ts`. The unversioned mount is removed, so `/api/...` returns 404. The duplicated segments are removed inside the routers: `/responses/responses/...`, `/reports/reports/...`, `/dimensions/dimensions/...` and `/questions/questions/...` are now `/responses/...`, `/reports/...`, `/dimensions/...` and `/questions/...`. The full old-to-new table is in the README (API Versioning). Health moved to `GET /health` at the root. The Swagger annotations show the real full paths. `POST /api/v1/students/AddStudent` keeps its name, because it is not a duplicate, and renaming it is a separate decision. The audit and gap-analysis documents in `docs/` still describe the pre-DEC-04 paths, because they record the state when they were written.
+
+### 8.5 DEC-03: token-bound candidate access
+
+A candidate has no account. The invite token is the only credential. `POST /api/v1/invites/assessment` takes the token in the body and returns the candidate's `studentId`, the test title and description, the active dimensions and the active questions. The token is in the body, not the URL, so it is not written to URL logs. The endpoint uses `findUsableInvite` (`src/modules/invites/invite-validation.ts`), the same function as submission, so the two cannot drift apart. Every refusal (unknown, revoked, expired, completed, or an inactive test, student or institute) returns one generic 404 and logs `invite_validation_failed` with the fixed reason, never the token.
+
+`POST /api/v1/responses/submit` no longer requires a JWT. The body token and `studentId` are checked as before (DB-03, SEC-05). The integration tests cover the submission with no `Authorization` header.
+
+The internal assessment reads are ADMIN-only, so a STUDENT token gets 403 on them. `GET /api/v1/tests/{id}` does not exist, so there is nothing to lock there.
+
+Covered by `candidate-invite-flow.integration.spec.ts` and the unit tests for the invite service, the invite controller and the response service. The assessment payload is checked for inactive rows, other tenants and internal fields.
 
 ---
 
@@ -274,7 +286,7 @@ Every module router is mounted once, under `/api/v1/v1`, in `src/app.ts`. The un
 - **No Redis in tests.** `server.ts` is not imported, so `connectRedis` never runs. Global and auth rate limiting, and the dimension cache, are no-ops. Rate-limit behaviour is not covered by integration tests.
 - **Sequential only.** `--runInBand` is required. Parallel runs would share one database.
 - **Single shared test database.** Suites are isolated by truncation, not by separate schemas.
-- **Student identity is not modelled.** `Student` has no link to `User`, so STUDENT-role tests use a `User` with no matching `Student` record. Tests for "a student reads their own data" cannot be written until DEC-03 is decided.
+- **Student identity is not modelled as an account.** `Student` has no link to `User`, and DEC-03 identifies a candidate by the invite token instead. A test for "a student reads their own data" needs a new decision that adds an account link.
 - **No load or timing tests.** Report performance (N+1 queries) is not measured.
 - **Swagger is not tested.** Path drift is documented in `API_IMPLEMENTATION_MATRIX.md` but not asserted.
 - **Console noise.** The app logs every request's business events and error details to the console during tests.

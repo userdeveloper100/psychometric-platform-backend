@@ -1,6 +1,6 @@
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
-import { countInvites, deleteInvite, getAllInvites, getStudentInvites, getTestInvites, inviteStudents } from './invite.service';
+import { countInvites, deleteInvite, getAllInvites, getCandidateAssessment, getStudentInvites, getTestInvites, inviteStudents } from './invite.service';
 
 jest.mock('../../config/prisma', () => {
     const client: any = {
@@ -254,6 +254,105 @@ describe('invite.service (SEC-05)', () => {
             psychometricTest.findFirst.mockResolvedValue(null);
             await expect(inviteStudents('t-b', ['s1'], 'u1', OWN)).rejects.toThrow('Test not found or access denied');
             expect(student.findMany).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('getCandidateAssessment (DEC-03)', () => {
+        const TOKEN = 'candidate-token-value-1234567890';
+        const pendingInvite = (overrides: Record<string, unknown> = {}) => ({
+            id: 'invite-a',
+            testId: 'test-a',
+            studentId: 'student-a',
+            status: 'PENDING',
+            expiresAt: null,
+            test: { instituteId: OWN, isActive: true, institute: { isActive: true } },
+            student: { instituteId: OWN, isActive: true },
+            ...overrides,
+        });
+        const assessment = {
+            id: 'test-a',
+            title: 'Leadership',
+            description: 'Measures leadership',
+            dimensions: [
+                {
+                    id: 'dim-a',
+                    name: 'Influence',
+                    questions: [{ id: 'q-a', text: 'I lead', scaleMin: 1, scaleMax: 5 }],
+                },
+            ],
+        };
+
+        test('returns the studentId, the test, the active dimensions and active questions for a valid token', async () => {
+            invite.findFirst.mockResolvedValue(pendingInvite());
+            psychometricTest.findFirst.mockResolvedValue(assessment);
+
+            const result = await getCandidateAssessment(TOKEN);
+
+            expect(result).toEqual({
+                studentId: 'student-a',
+                test: { id: 'test-a', title: 'Leadership', description: 'Measures leadership' },
+                dimensions: assessment.dimensions,
+            });
+        });
+
+        test('reads only active dimensions and questions, and only the candidate fields', async () => {
+            invite.findFirst.mockResolvedValue(pendingInvite());
+            psychometricTest.findFirst.mockResolvedValue(assessment);
+
+            await getCandidateAssessment(TOKEN);
+
+            const args = psychometricTest.findFirst.mock.calls[0][0];
+            expect(args.where).toEqual({ id: 'test-a', isActive: true });
+            expect(args.select.dimensions.where).toEqual({ isActive: true });
+            expect(args.select.dimensions.select.questions.where).toEqual({ isActive: true });
+            expect(Object.keys(args.select.dimensions.select.questions.select).sort()).toEqual(
+                ['id', 'scaleMax', 'scaleMin', 'text']
+            );
+            expect(Object.keys(args.select.dimensions.select).sort()).toEqual(['id', 'name', 'questions']);
+        });
+
+        test('never returns internal fields such as instituteId, createdBy or isActive', async () => {
+            invite.findFirst.mockResolvedValue(pendingInvite());
+            psychometricTest.findFirst.mockResolvedValue(assessment);
+
+            const result = JSON.stringify(await getCandidateAssessment(TOKEN));
+
+            expect(result).not.toContain(OWN);
+            expect(result).not.toContain('createdBy');
+            expect(result).not.toContain('isActive');
+            expect(result).not.toContain(TOKEN);
+        });
+
+        test.each([
+            ['an unknown or revoked token', null, 'Invalid or inactive invite token'],
+            ['an expired invite', pendingInvite({ expiresAt: new Date(Date.now() - 60_000) }), 'Invite has expired'],
+            ['a completed invite', pendingInvite({ status: 'COMPLETED' }), 'Responses already submitted for this invite'],
+            ['an inactive institute', pendingInvite({ test: { instituteId: OWN, isActive: true, institute: { isActive: false } } }), 'Invalid or inactive invite token'],
+            ['an inactive test', pendingInvite({ test: { instituteId: OWN, isActive: false, institute: { isActive: true } } }), 'Invalid or inactive invite token'],
+            ['an inactive student', pendingInvite({ student: { instituteId: OWN, isActive: false } }), 'Invalid or inactive invite token'],
+        ])('refuses %s with the matching fixed message and reads no assessment', async (_label, row, message) => {
+            invite.findFirst.mockResolvedValue(row);
+
+            await expect(getCandidateAssessment(TOKEN)).rejects.toThrow(message);
+            expect(psychometricTest.findFirst).not.toHaveBeenCalled();
+        });
+
+        test('refuses when the test is no longer active at read time', async () => {
+            invite.findFirst.mockResolvedValue(pendingInvite());
+            psychometricTest.findFirst.mockResolvedValue(null);
+
+            await expect(getCandidateAssessment(TOKEN)).rejects.toThrow('Invalid or inactive invite token');
+        });
+
+        test('the token is not written to the logger', async () => {
+            invite.findFirst.mockResolvedValue(null);
+
+            await expect(getCandidateAssessment(TOKEN)).rejects.toThrow();
+            const logged = JSON.stringify([
+                (logger.info as jest.Mock).mock.calls,
+                (logger.error as jest.Mock).mock.calls,
+            ]);
+            expect(logged).not.toContain(TOKEN);
         });
     });
 });

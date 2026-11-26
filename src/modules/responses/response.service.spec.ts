@@ -189,7 +189,7 @@ describe('submitResponses invite validation (SEC-05)', () => {
         studentId: 'student-a',
         status: 'PENDING',
         expiresAt: null,
-        test: { instituteId: OWN, isActive: true },
+        test: { instituteId: OWN, isActive: true, institute: { isActive: true } },
         student: { instituteId: OWN, isActive: true },
         ...overrides,
     });
@@ -248,7 +248,7 @@ describe('submitResponses response integrity (DB-03)', () => {
         studentId: 'student-a',
         status: 'PENDING',
         expiresAt: null,
-        test: { instituteId: OWN, isActive: true },
+        test: { instituteId: OWN, isActive: true, institute: { isActive: true } },
         student: { instituteId: OWN, isActive: true },
         ...overrides,
     });
@@ -324,6 +324,12 @@ describe('submitResponses response integrity (DB-03)', () => {
         expect(questionMock.findMany.mock.calls[0][0].where.dimension).toEqual(
             expect.objectContaining({ isActive: true, test: expect.objectContaining({ isActive: true }) })
         );
+        expectNothingWritten();
+    });
+
+    test('an inactive institute is refused with the generic invite message and writes zero rows (DEC-03)', async () => {
+        inviteMock.findFirst.mockResolvedValue(invite({ test: { instituteId: OWN, isActive: true, institute: { isActive: false } } }));
+        await expect(submitResponses(payload, 'system')).rejects.toThrow('Invalid or inactive invite token');
         expectNothingWritten();
     });
 

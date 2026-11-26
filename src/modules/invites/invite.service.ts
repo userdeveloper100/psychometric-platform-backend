@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import { InviteStatus, Prisma } from '@prisma/client';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
+import { findUsableInvite } from './invite-validation';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -362,4 +363,46 @@ export async function deleteInvite(
         if (error instanceof Error) throw error;
         throw new Error('Failed to delete invite');
     }
+}
+
+// ─── Candidate Assessment (DEC-03) ────────────────────────────────────────────
+
+/**
+ * DEC-03: a candidate loads the assessment with the invite token alone. The token is checked with the same
+ * rules as submission (findUsableInvite). The response holds only what the candidate needs to take the test:
+ * the test title and description, the active dimensions, the active questions, and the candidate's own studentId,
+ * which the submission must echo back. Nothing else from the tenant is returned.
+ */
+export async function getCandidateAssessment(token: string) {
+    const invite = await findUsableInvite(prisma, token, new Date());
+
+    const test = await prisma.psychometricTest.findFirst({
+        where: { id: invite.testId, isActive: true },
+        select: {
+            id: true,
+            title: true,
+            description: true,
+            dimensions: {
+                where: { isActive: true },
+                orderBy: { createdAt: 'asc' },
+                select: {
+                    id: true,
+                    name: true,
+                    questions: {
+                        where: { isActive: true },
+                        orderBy: { createdAt: 'asc' },
+                        select: { id: true, text: true, scaleMin: true, scaleMax: true }
+                    }
+                }
+            }
+        }
+    });
+
+    if (!test) throw new Error('Invalid or inactive invite token');
+
+    return {
+        studentId: invite.studentId,
+        test: { id: test.id, title: test.title, description: test.description },
+        dimensions: test.dimensions
+    };
 }
