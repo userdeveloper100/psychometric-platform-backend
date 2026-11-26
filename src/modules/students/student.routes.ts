@@ -63,7 +63,7 @@ const router = Router();
 router.get(
     '/',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     studentController.getStudents
 );
 
@@ -142,7 +142,7 @@ router.get(
 router.post(
     '/AddStudent',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     createStudentValidation,
     validateRequest,
     studentController.createStudent
@@ -150,7 +150,7 @@ router.post(
 
 /**
  * @route   POST /api/v1/students/bulk-upload
- * @desc    Bulk upload students from array (ADMIN only)
+ * @desc    Bulk upload students from array (ADMIN or RECRUITER)
  * @access  Private
  */
 /**
@@ -198,14 +198,14 @@ router.post(
 router.post(
     '/bulk-upload',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     studentController.bulkUploadStudents
 );
 
 
 /**
  * @route   DELETE /api/v1/students/:id
- * @desc    Soft delete a student (ADMIN only)
+ * @desc    Soft delete a student (ADMIN or RECRUITER)
  * @access  Private
  */
 /**
@@ -251,7 +251,7 @@ router.post(
 router.delete(
     '/:id',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     studentController.deleteStudent
 );
 

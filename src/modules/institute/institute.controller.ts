@@ -16,6 +16,8 @@ import {
 import { ErrorCode } from '../../types/api-response.types';
 import { logSecurityEvent } from '../../utils/security-logger';
 
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // ─── Create Institute ─────────────────────────────────────────────────────────
 
 export const createInstitute = async (
@@ -23,19 +25,37 @@ export const createInstitute = async (
     res: Response
 ): Promise<Response> => {
     try {
-        const { name, email } = req.body;
+        const { name, email, initialAdminEmail } = req.body;
 
         if (!name || !email) {
             return badRequestResponse(res, 'name and email are required', {
                 required: ['name', 'email']
             });
         }
+        if (initialAdminEmail !== undefined && (typeof initialAdminEmail !== 'string' || !EMAIL_SHAPE.test(initialAdminEmail.trim()))) {
+            return badRequestResponse(res, 'initialAdminEmail must be a valid email');
+        }
 
-        const institute = await instituteService.createInstitute({ name, email });
+        // DEC-01: the route allows SUPER_ADMIN only. The actor comes from the verified token.
+        const actor = (req as any).user;
+        const institute = await instituteService.createInstitute({
+            name,
+            email,
+            initialAdminEmail: initialAdminEmail?.trim(),
+            createdBy: actor.userId
+        });
+
+        logSecurityEvent('sensitive_admin_action', {
+            userId: actor.userId,
+            role: actor.role,
+            action: 'create_institute',
+            resourceType: 'institute',
+            resourceId: institute.id,
+        });
 
         return createdResponse(res, institute, 'Institute created successfully');
     } catch (error: any) {
-        if (error.message === 'Institute with this email already exists') {
+        if (error.message === 'Institute with this email already exists' || error.message === 'Email already registered') {
             return conflictResponse(res, error.message);
         }
         return serverErrorResponse(res, error.message || 'Failed to create institute');

@@ -70,6 +70,24 @@ describe('auth.controller', () => {
             expect(days).toBeLessThan(7.1);
         });
 
+        test('403 for a SUPER_ADMIN invite (privilege escalation), with no service call', async () => {
+            const res = mockResponse();
+
+            await authController.createUserInvite(adminReq({ email: 't@b.com', role: 'SUPER_ADMIN' }), res);
+
+            expect(statusCode(res)).toBe(403);
+            expect(svc.createUserInvite).not.toHaveBeenCalled();
+        });
+
+        test.each(['RECRUITER', 'EVALUATOR', 'ADMIN', 'STUDENT'])('%s can be invited (201 path reaches the service)', async (role) => {
+            svc.createUserInvite.mockResolvedValue({ invite: { id: 'inv1' }, token: 't' } as any);
+            const res = mockResponse();
+
+            await authController.createUserInvite(adminReq({ email: 't@b.com', role }), res);
+
+            expect(statusCode(res)).toBe(201);
+        });
+
         test('403 when the token has no institute (fails closed, no service call)', async () => {
             const res = mockResponse();
 
@@ -82,7 +100,7 @@ describe('auth.controller', () => {
         test.each([
             ['a missing email', { role: 'ADMIN' }],
             ['a malformed email', { email: 'not-an-email', role: 'ADMIN' }],
-            ['an unknown role', { email: 't@b.com', role: 'SUPER_ADMIN' }],
+            ['an unknown role', { email: 't@b.com', role: 'OWNER' }],
             ['a past expiry', { email: 't@b.com', role: 'ADMIN', expiresAt: '2000-01-01T00:00:00.000Z' }],
             ['an expiry beyond 30 days', { email: 't@b.com', role: 'ADMIN', expiresAt: '2999-01-01T00:00:00.000Z' }],
             ['an unparseable expiry', { email: 't@b.com', role: 'ADMIN', expiresAt: 'soon' }],

@@ -114,7 +114,7 @@ describe('issuing a user invite (ADMIN, DEC-02)', () => {
         const badEmail = await api.post('/api/v1/auth/invites', fx.a.adminToken).send({ email: 'nope', role: 'ADMIN' });
         const badRole = await api
             .post('/api/v1/auth/invites', fx.a.adminToken)
-            .send({ email: 'ok@integration.test', role: 'SUPER_ADMIN' });
+            .send({ email: 'ok@integration.test', role: 'OWNER' });
 
         expect(badEmail.status).toBe(400);
         expect(badRole.status).toBe(400);

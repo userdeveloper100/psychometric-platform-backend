@@ -136,11 +136,13 @@ describe('SEC-02: unauthenticated requests are refused with 401', () => {
     });
 });
 
-describe('SEC-02: ADMIN can create an institute (provisional, see DEC-01)', () => {
-    test('admin of A creates an institute (201)', async () => {
+describe('DEC-01: only SUPER_ADMIN provisions institutes', () => {
+    test('a tenant ADMIN cannot create an institute (403), and none is created', async () => {
+        const before = await prisma.institute.count();
         const res = await api
             .post('/api/v1/institutes', fx.a.adminToken)
             .send({ name: 'Second institute', email: 'second@integration.test' });
-        expect(res.status).toBe(201);
+        expect(res.status).toBe(403);
+        expect(await prisma.institute.count()).toBe(before);
     });
 });

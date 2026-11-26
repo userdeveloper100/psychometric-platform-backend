@@ -62,7 +62,7 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.create
  * /api/v1/tests:
  *   get:
  *     summary: Get all tests
- *     description: Fetch all active tests with optional pagination. ADMIN role required.
+ *     description: Fetch all active tests with optional pagination. ADMIN, RECRUITER or EVALUATOR role required.
  *     tags: [Tests]
  *     parameters:
  *       - in: query
@@ -102,7 +102,7 @@ router.post('/', authenticateJWT, authorizeRoles('ADMIN'), testController.create
  *       500:
  *         description: Internal server error
  */
-router.get('/', authenticateJWT, authorizeRoles('ADMIN'), testController.getAllTests);
+router.get('/', authenticateJWT, authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'), testController.getAllTests);
 
 /**
  * @route   PATCH /api/v1/tests/:id/publish

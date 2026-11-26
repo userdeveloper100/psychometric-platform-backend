@@ -36,13 +36,13 @@ const router = Router();
 router.get(
     '/',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     inviteController.getAllInvites
 );
 
 /**
  * @route   POST /api/v1/invites/tests/:testId/invite
- * @desc    Invite students to a test (ADMIN only)
+ * @desc    Invite students to a test (ADMIN or RECRUITER)
  * @access  Private
  */
 /**
@@ -98,13 +98,13 @@ router.get(
 router.post(
     '/tests/:testId/invite',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     inviteController.inviteStudents
 );
 
 /**
  * @route   GET /api/v1/invites/tests/:testId/invites
- * @desc    Get all invites for a test (ADMIN only)
+ * @desc    Get all invites for a test (ADMIN or RECRUITER)
  * @access  Private
  */
 /**
@@ -150,7 +150,7 @@ router.post(
 router.get(
     '/tests/:testId/invites',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     inviteController.getTestInvites
 );
 
@@ -202,13 +202,13 @@ router.get(
 router.get(
     '/students/:studentId/invites',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     inviteController.getStudentInvites
 );
 
 /**
  * @route   DELETE /api/v1/invites/:id
- * @desc    Soft delete an invite (ADMIN only)
+ * @desc    Soft delete an invite (ADMIN or RECRUITER)
  * @access  Private
  */
 /**
@@ -254,7 +254,7 @@ router.get(
 router.delete(
     '/:id',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER'),
     inviteController.deleteInvite
 );
 

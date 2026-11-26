@@ -3,7 +3,7 @@ import * as instituteController from './institute.controller';
 import { authenticateJWT } from '../../middleware/auth.middleware';
 import { authorizeRoles } from '../../middleware/role.middleware';
 
-// SEC-02: every institute route requires a valid token and the ADMIN role. Tenant scope is
+// DEC-01: POST /institutes requires SUPER_ADMIN. The other institute routes require the ADMIN role. Tenant scope is
 // enforced in the controller and service (an ADMIN can only act on their own institute).
 
 const router = Router();
@@ -13,43 +13,55 @@ const router = Router();
  * @swagger
  * /api/v1/institutes:
  *   post:
- *     summary: Create resource (/)
- *     description: Institutes API endpoint.
+ *     summary: Provision an institute (SUPER_ADMIN only)
+ *     description: |
+ *       DEC-01: only a SUPER_ADMIN (platform level, no institute) can create an institute. A tenant ADMIN gets 403.
+ *       With initialAdminEmail, the institute and its first ADMIN invite are created in one transaction. The raw invite
+ *       token is returned once, in initialAdminInvite.token. The admin accepts it with POST /api/v1/auth/accept-invite.
  *     tags: [Institutes]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             additionalProperties: true
+ *             required:
+ *               - name
+ *               - email
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Acme Institute
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: hq@acme.com
+ *               initialAdminEmail:
+ *                 type: string
+ *                 format: email
+ *                 description: Optional. Creates the first ADMIN invite for this institute.
+ *                 example: admin@acme.com
  *           example:
- *             name: "Sample Name"
- *             description: "Sample payload"
+ *             name: Acme Institute
+ *             email: hq@acme.com
+ *             initialAdminEmail: admin@acme.com
  *     responses:
- *       200:
- *         description: Request successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Success"
  *       201:
- *         description: Resource created successfully
+ *         description: Institute created. initialAdminInvite is present only when initialAdminEmail was sent.
  *       400:
- *         description: Bad request
- *       404:
- *         description: Resource not found
+ *         description: name, email or initialAdminEmail is missing or malformed
+ *       401:
+ *         description: No token provided or invalid token
+ *       403:
+ *         description: Forbidden. SUPER_ADMIN role required.
+ *       409:
+ *         description: The institute email exists, or the initial admin email already has an account
  *       500:
  *         description: Internal server error
  */
-router.post('/', authenticateJWT, authorizeRoles('ADMIN'), instituteController.createInstitute);
+router.post('/', authenticateJWT, authorizeRoles('SUPER_ADMIN'), instituteController.createInstitute);
 
 // Read
 /**

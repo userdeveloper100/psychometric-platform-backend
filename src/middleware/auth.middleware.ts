@@ -24,8 +24,14 @@ export const authenticateJWT = (
     const token = authHeader.split(' ')[1];
     try {
         // Same validated secret that utils/jwt.ts signs with.
-        const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string; instituteId?: string };
-        req.user = decoded;
+        const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string; instituteId?: string | null };
+        // DEC-01: SUPER_ADMIN is the only platform-level role. Every other role must carry an institute. Same fail-closed
+        // 403 that the tenant routes return, so the response does not change with the route.
+        if (decoded.role !== 'SUPER_ADMIN' && !decoded.instituteId) {
+            logSecurityEvent('auth_failed', { reason: 'institute_scope_missing', userId: decoded.userId, role: decoded.role });
+            return res.status(403).json({ message: 'Forbidden: Institute scope is required' });
+        }
+        req.user = { ...decoded, instituteId: decoded.instituteId ?? undefined };
         next();
     } catch (err) {
         // Only the failure kind is logged. The token itself and the jwt error text are never written.

@@ -33,7 +33,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.get('/', authenticateJWT, authorizeRoles('ADMIN'), responseController.getAllResponses);
+router.get('/', authenticateJWT, authorizeRoles('ADMIN', 'EVALUATOR'), responseController.getAllResponses);
 
 /**
  * @swagger
@@ -120,7 +120,7 @@ router.post('/submit', responseController.submitResponses);
 router.get(
     '/student/:studentId',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'EVALUATOR'),
     responseController.getStudentResponses
 );
 /**
@@ -163,7 +163,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.get('/test/:testId', authenticateJWT, authorizeRoles('ADMIN'), responseController.getTestResponses);
+router.get('/test/:testId', authenticateJWT, authorizeRoles('ADMIN', 'EVALUATOR'), responseController.getTestResponses);
 
 /**
  * @swagger

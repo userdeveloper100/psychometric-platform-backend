@@ -1,10 +1,13 @@
 import prisma from '../../config/prisma';
 import { Prisma } from '@prisma/client';
 import { softDeleteAudit } from '../../utils/softDelete';
+import { generateInviteToken, hashInviteToken } from '../../utils/invite-token';
 
 interface CreateInstituteInput {
     name: string;
     email: string;
+    initialAdminEmail?: string;
+    createdBy: string;
 }
 
 interface GetInstitutesOptions {
@@ -33,24 +36,59 @@ export function assertOwnInstitute(id: string, requestingInstituteId: string): v
 
 // ─── Create Institute ─────────────────────────────────────────────────────────
 
-export async function createInstitute({ name, email }: CreateInstituteInput) {
-    try {
-        const institute = await prisma.institute.create({
-            data: {
-                name,
-                email,
-                isActive: true
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                createdAt: true
-            }
-        });
+const INITIAL_ADMIN_INVITE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-        return institute;
+/**
+ * DEC-01: SUPER_ADMIN provisions a tenant. The institute and, when an initial admin email is given, that admin's
+ * invite are created in one transaction, so a failed step leaves neither behind. The raw invite token is returned
+ * once, to the caller that created it, and only its hash is stored.
+ */
+export async function createInstitute({ name, email, initialAdminEmail, createdBy }: CreateInstituteInput) {
+    const token = initialAdminEmail ? generateInviteToken() : null;
+    const now = new Date();
+
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const institute = await tx.institute.create({
+                data: {
+                    name,
+                    email,
+                    isActive: true
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    createdAt: true
+                }
+            });
+
+            if (!initialAdminEmail || !token) return { ...institute, initialAdminInvite: null };
+
+            // Platform-level check: SUPER_ADMIN may learn that an email is taken. Accept refuses it generically anyway.
+            const existing = await tx.user.findUnique({ where: { email: initialAdminEmail }, select: { id: true } });
+            if (existing) throw new Error('Email already registered');
+
+            const invite = await tx.userInvite.create({
+                data: {
+                    email: initialAdminEmail,
+                    role: 'ADMIN',
+                    tokenHash: hashInviteToken(token),
+                    expiresAt: new Date(now.getTime() + INITIAL_ADMIN_INVITE_DAYS * DAY_MS),
+                    instituteId: institute.id,
+                    createdBy
+                },
+                select: { id: true, email: true, role: true, expiresAt: true }
+            });
+
+            return { ...institute, initialAdminInvite: { invite, token } };
+        }, {
+            maxWait: 5000,
+            timeout: 10000
+        });
     } catch (error) {
+        if (error instanceof Error && error.message === 'Email already registered') throw error;
         if (
             error instanceof Prisma.PrismaClientKnownRequestError &&
             error.code === 'P2002'

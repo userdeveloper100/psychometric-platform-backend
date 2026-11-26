@@ -15,7 +15,7 @@ describe('institute.controller', () => {
     describe('createInstitute', () => {
         test('201 on success', async () => {
             svc.createInstitute.mockResolvedValue({ id: 'i1' } as any);
-            const req = mockRequest({ body: { name: 'Acme', email: 'a@b.com' } });
+            const req = mockRequest({ body: { name: 'Acme', email: 'a@b.com' }, user: { userId: 'sa1', role: 'SUPER_ADMIN' } });
             const res = mockResponse();
 
             await instituteController.createInstitute(req, res);
@@ -34,7 +34,7 @@ describe('institute.controller', () => {
 
         test('409 on duplicate email', async () => {
             svc.createInstitute.mockRejectedValue(new Error('Institute with this email already exists'));
-            const req = mockRequest({ body: { name: 'Acme', email: 'a@b.com' } });
+            const req = mockRequest({ body: { name: 'Acme', email: 'a@b.com' }, user: { userId: 'sa1', role: 'SUPER_ADMIN' } });
             const res = mockResponse();
 
             await instituteController.createInstitute(req, res);
@@ -186,6 +186,37 @@ describe('institute.controller', () => {
 
             expect(svc.getAllInstitutes).toHaveBeenCalledWith({ page: 1, limit: 10, instituteId: 'institute-a' });
             expect(statusCode(res)).toBe(200);
+        });
+    });
+    describe("createInstitute provisioning (DEC-01)", () => {
+        const superReq = (body: Record<string, unknown>) =>
+            mockRequest({ body, user: { userId: "sa1", role: "SUPER_ADMIN" } });
+
+        test("passes the initial admin email and the actor to the service, and returns the one-time invite token", async () => {
+            svc.createInstitute.mockResolvedValue({ id: "i1", initialAdminInvite: { token: "raw-once" } } as any);
+            const res = mockResponse();
+
+            await instituteController.createInstitute(
+                superReq({ name: "Acme", email: "a@b.com", initialAdminEmail: "admin@acme.com" }),
+                res
+            );
+
+            expect(statusCode(res)).toBe(201);
+            expect(svc.createInstitute).toHaveBeenCalledWith(
+                expect.objectContaining({ initialAdminEmail: "admin@acme.com", createdBy: "sa1" })
+            );
+        });
+
+        test("400 for a malformed initial admin email, and no institute is created", async () => {
+            const res = mockResponse();
+
+            await instituteController.createInstitute(
+                superReq({ name: "Acme", email: "a@b.com", initialAdminEmail: "not-an-email" }),
+                res
+            );
+
+            expect(statusCode(res)).toBe(400);
+            expect(svc.createInstitute).not.toHaveBeenCalled();
         });
     });
 });

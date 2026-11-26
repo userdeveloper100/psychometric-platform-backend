@@ -30,8 +30,10 @@ model User {
   password String
   role     Role
 
-  instituteId String
-  institute   Institute @relation(fields: [instituteId], references: [id])
+  // DEC-01: null only for SUPER_ADMIN (platform level). Every other role needs an institute. The database
+  // CHECK constraint in the DEC-01 migration and the auth middleware both enforce this.
+  instituteId String?
+  institute   Institute? @relation(fields: [instituteId], references: [id], onDelete: Restrict)
 
   createdBy String?
   createdAt DateTime @default(now())
@@ -188,8 +190,13 @@ model UserInvite {
   @@index([instituteId])
 }
 
+// DEC-01: SUPER_ADMIN provisions tenants. ADMIN, RECRUITER and EVALUATOR work inside one institute.
+// STUDENT is the candidate role. See docs/INTEGRATION_TESTING.md for the permission matrix.
 enum Role {
+  SUPER_ADMIN
   ADMIN
+  RECRUITER
+  EVALUATOR
   STUDENT
 }
 

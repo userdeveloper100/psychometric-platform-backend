@@ -572,44 +572,61 @@ Every module is served under `/api/v1/<resource>` (`DEC-04`). The unversioned `/
 | Auth | POST | `/api/v1/auth/register` | Disabled: always 403 (DEC-02) |
 | Auth | POST | `/api/v1/auth/login` | Public (rate limited) |
 | Auth | POST | `/api/v1/auth/accept-invite` | Public, invite token in the body, rate limited (DEC-02) |
-| Auth | POST | `/api/v1/auth/invites` | ADMIN, own institute (DEC-02) |
+| Auth | POST | `/api/v1/auth/invites` | ADMIN, own institute. Roles: ADMIN, RECRUITER, EVALUATOR, STUDENT. Never SUPER_ADMIN (DEC-01) |
 | Auth | GET | `/api/v1/auth/invites` | ADMIN, own institute (DEC-02) |
 | Auth | DELETE | `/api/v1/auth/invites/{id}` | ADMIN, own institute (DEC-02) |
 | Auth | GET | `/api/v1/auth/users` | ADMIN, own institute |
-| Institutes | POST | `/api/v1/institutes` | ADMIN |
+| Institutes | POST | `/api/v1/institutes` | SUPER_ADMIN only. Optional `initialAdminEmail` (DEC-01) |
 | Institutes | GET | `/api/v1/institutes` | ADMIN |
 | Institutes | GET, PUT, DELETE | `/api/v1/institutes/{id}` | ADMIN, own institute only |
 | Tests | POST | `/api/v1/tests` | ADMIN |
-| Tests | GET | `/api/v1/tests` | ADMIN, own institute |
+| Tests | GET | `/api/v1/tests` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Tests | PATCH | `/api/v1/tests/{id}/publish` | ADMIN |
 | Tests | DELETE | `/api/v1/tests/{id}` | ADMIN |
-| Dimensions | GET | `/api/v1/dimensions` | ADMIN, own institute |
-| Dimensions | GET | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN, own institute |
+| Dimensions | GET | `/api/v1/dimensions` | ADMIN, RECRUITER, EVALUATOR (own institute) |
+| Dimensions | GET | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Dimensions | POST | `/api/v1/dimensions/tests/{testId}/dimensions` | ADMIN |
 | Dimensions | DELETE | `/api/v1/dimensions/{id}` | ADMIN |
-| Questions | GET | `/api/v1/questions` | ADMIN, own institute |
-| Questions | GET | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN, own institute |
+| Questions | GET | `/api/v1/questions` | ADMIN, RECRUITER, EVALUATOR (own institute) |
+| Questions | GET | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Questions | POST | `/api/v1/questions/dimensions/{dimensionId}/questions` | ADMIN |
 | Questions | DELETE | `/api/v1/questions/{id}` | ADMIN |
-| Students | GET | `/api/v1/students` | ADMIN |
-| Students | POST | `/api/v1/students/AddStudent` | ADMIN |
-| Students | POST | `/api/v1/students/bulk-upload` | ADMIN |
-| Students | DELETE | `/api/v1/students/{id}` | ADMIN |
-| Invites | GET | `/api/v1/invites` | ADMIN |
-| Invites | POST | `/api/v1/invites/tests/{testId}/invite` | ADMIN |
-| Invites | GET | `/api/v1/invites/tests/{testId}/invites` | ADMIN |
-| Invites | GET | `/api/v1/invites/students/{studentId}/invites` | ADMIN |
-| Invites | DELETE | `/api/v1/invites/{id}` | ADMIN |
+| Students | GET | `/api/v1/students` | ADMIN, RECRUITER (own institute) |
+| Students | POST | `/api/v1/students/AddStudent` | ADMIN, RECRUITER (own institute) |
+| Students | POST | `/api/v1/students/bulk-upload` | ADMIN, RECRUITER (own institute) |
+| Students | DELETE | `/api/v1/students/{id}` | ADMIN, RECRUITER (own institute) |
+| Invites | GET | `/api/v1/invites` | ADMIN, RECRUITER (own institute) |
+| Invites | POST | `/api/v1/invites/tests/{testId}/invite` | ADMIN, RECRUITER (own institute) |
+| Invites | GET | `/api/v1/invites/tests/{testId}/invites` | ADMIN, RECRUITER (own institute) |
+| Invites | GET | `/api/v1/invites/students/{studentId}/invites` | ADMIN, RECRUITER (own institute) |
+| Invites | DELETE | `/api/v1/invites/{id}` | ADMIN, RECRUITER (own institute) |
 | Invites | POST | `/api/v1/invites/assessment` | Public, invite token in the body (DEC-03) |
-| Responses | GET | `/api/v1/responses` | ADMIN |
+| Responses | GET | `/api/v1/responses` | ADMIN, EVALUATOR (own institute) |
 | Responses | POST | `/api/v1/responses/submit` | Public, invite token in the body (DEC-03, no JWT) |
-| Responses | GET | `/api/v1/responses/student/{studentId}` | ADMIN |
-| Responses | GET | `/api/v1/responses/test/{testId}` | ADMIN |
+| Responses | GET | `/api/v1/responses/student/{studentId}` | ADMIN, EVALUATOR (own institute) |
+| Responses | GET | `/api/v1/responses/test/{testId}` | ADMIN, EVALUATOR (own institute) |
 | Responses | DELETE | `/api/v1/responses/{id}` | ADMIN |
-| Reports | GET | `/api/v1/reports` | ADMIN |
-| Reports | GET | `/api/v1/reports/test/{testId}` | ADMIN |
-| Reports | GET | `/api/v1/reports/student/{studentId}/test/{testId}` | ADMIN |
+| Reports | GET | `/api/v1/reports` | ADMIN, RECRUITER, EVALUATOR (own institute) |
+| Reports | GET | `/api/v1/reports/test/{testId}` | ADMIN, RECRUITER, EVALUATOR (own institute) |
+| Reports | GET | `/api/v1/reports/student/{studentId}/test/{testId}` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Health | GET | `/health` | Public |
+
+**Role permission matrix (DEC-01).** A foreign institute id returns 404 for every tenant role. A role not listed for a capability gets 403.
+
+| Capability | SUPER_ADMIN | ADMIN | RECRUITER | EVALUATOR | STUDENT (candidate) |
+|---|---|---|---|---|---|
+| Provision an institute (`POST /institutes`) | Yes | No | No | No | No |
+| Read or change own institute (`GET`, `PUT`, `DELETE /institutes/{id}`) | No (no institute) | Yes | No | No | No |
+| Create, publish, delete tests, dimensions, questions | No | Yes | No | No | No |
+| Read tests, dimensions, questions | No | Yes | Yes | Yes | No |
+| Manage candidates (students) | No | Yes | Yes | No | No |
+| Issue and revoke candidate test invites | No | Yes | Yes | No | No |
+| Read responses | No | Yes | No | Yes | No |
+| Delete responses | No | Yes | No | No | No |
+| Read reports | No | Yes | Yes | Yes | No |
+| Issue staff and user invites (ADMIN, RECRUITER, EVALUATOR, STUDENT) | No | Yes | No | No | No |
+| Invite a SUPER_ADMIN | No | No (403, logged) | No | No | No |
+| Take the assessment and submit responses with the invite token (no JWT) | No | No | No | No | Yes |
 
 **Route changes in `DEC-04` (old → new):**
 
@@ -889,6 +906,7 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Task | Summary | Reference |
 |---|---|---|
+| `DEC-01` Multi-tenant Enterprise Recruiting SaaS Roles | Five roles: `SUPER_ADMIN` (platform, no institute), `ADMIN`, `RECRUITER` and `EVALUATOR` (tenant staff, one institute each), and `STUDENT` (candidate, invite token only). `User.instituteId` is nullable for SUPER_ADMIN only, and a database CHECK requires an institute for every other user. `POST /api/v1/institutes` is SUPER_ADMIN only. With `initialAdminEmail`, the institute and its first ADMIN invite are created in one transaction, and the raw token is returned once. Staff invites can grant ADMIN, RECRUITER, EVALUATOR or STUDENT. A SUPER_ADMIN invite is refused (403) and logged. RECRUITER manages candidates and test invites and reads tests, dimensions, questions and reports. EVALUATOR reads tests, dimensions, questions, responses and reports. Both get 403 on writes and invites, and 404 on foreign institute resources. Migrations `20261126130000_add_dec01_saas_roles` and `20261126130100_add_dec01_tenant_scope_checks`. | `feat: implement multi-tenant enterprise recruiting saas roles` |
 | `DEC-02` Invitation-only Onboarding | Public self-registration is closed. `POST /api/v1/auth/register` always returns 403 and logs `authorization_denied`. An ADMIN issues a user invite with `POST /api/v1/auth/invites`, scoped to the token's institute. The raw token is returned once, and only its SHA-256 hash is stored (`UserInvite.tokenHash`, additive migration `20261126120000_add_user_invites`). `POST /api/v1/auth/accept-invite` is public and token-bound. It creates the user in the invited institute and role, and consumes the invite in one transaction with a conditional claim, so it is single use. Every unusable invite returns one generic 400 and logs `invite_validation_failed` without the token. ADMINs list and revoke only their own institute's invites (`GET` and `DELETE /api/v1/auth/invites`). A foreign invite returns 404. | `feat: enforce invitation-only user onboarding` |
 | `DEC-03` Token-bound Candidate Access via `TestInvite` | A candidate is identified by the invite token alone. `POST /api/v1/invites/assessment` takes the token in the body and returns the test title and description, the candidate's `studentId`, the active dimensions and the active questions. Inactive dimensions and questions are excluded, and no internal fields are returned. The endpoint applies the same rules as submission (`findUsableInvite` in `src/modules/invites/invite-validation.ts`): the invite must exist, be pending and unexpired, match the student, and have an active test, student and institute. Every refusal returns one generic 404 and logs `invite_validation_failed` without the token. `POST /api/v1/responses/submit` no longer requires a JWT; the invite token is the only credential, and the DB-03 and SEC-05 checks are unchanged. Internal assessment reads (`GET /api/v1/tests`, `GET /api/v1/dimensions`, `GET /api/v1/dimensions/tests/{testId}/dimensions`, `GET /api/v1/questions` and `GET /api/v1/questions/dimensions/{dimensionId}/questions`) are ADMIN only, so a STUDENT token gets 403. The schema has no link between `Student` and `User`, and none was added. | `feat: enforce token-bound candidate assessment flow` |
 | `DEC-04` Standardized `/api/v1` Routes & Duplicate Segment Cleanup | Every module router is mounted under `/api/v1/<resource>`. The unversioned `/api/...` paths return 404. The duplicated segments are removed: `/responses/responses/...`, `/reports/reports/...`, `/dimensions/dimensions/...` and `/questions/questions/...` are now `/responses/...`, `/reports/...`, `/dimensions/...` and `/questions/...`. Health moved to `GET /health` at the root. Swagger annotations show the real full paths. Authentication, role checks and tenant checks are unchanged. The full old-to-new table is in the API Versioning section | `feat: standardize api v1 routes and remove duplicate path segments` |
@@ -910,16 +928,19 @@ Tracks the remediation of the findings in `docs/IMPLEMENTATION_AUDIT.md`. Each t
 
 | Decision | Status |
 |---|---|
-| `DEC-01` Multi-tenant Enterprise Recruiting SaaS | `DECIDED — NEXT` |
+| `DEC-01` Multi-tenant Enterprise Recruiting SaaS | `DONE` (see Completed) |
 | `DEC-02` Invitation-only onboarding | `DONE` (see Completed) |
 | `DEC-03` Token-bound candidates via `TestInvite` | `DONE` (see Completed) |
 | `DEC-04` Standardized `/api/v1` routes | `DONE` (see Completed) |
 
-DEC-02, DEC-03 and DEC-04 are implemented. DEC-01 is recorded here, and its behaviour change is not implemented yet.
+DEC-01 to DEC-04 are implemented. The P1 database items DB-01 to DB-03 are recorded in Completed as well. Open follow-ups are listed below. They are not part of the decisions.
+
+The tracker records these security items as done: SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10 and SEC-11. **SEC-04, SEC-08 and SEC-09 have no entry in Completed**, so this tracker cannot show them as done. Confirm their status before calling the P0 security list complete.
 
 **Post-decision follow-ups** (not started; each depends on the decisions above or on a migration):
 
-- **DEC-02 (done):** public registration is closed. No API creates an institute now, so the first institute and ADMIN need another route (seed or operator tooling). This is an open decision. An invite's `name` is validated but not stored, because `User` has no name column. A `STUDENT` invite creates a `User` with no `Student` link, which DEC-03 leaves open. The invite expiry is capped at 30 days, and there is no password policy yet. Deploy the migration `20261126120000_add_user_invites` to `psychometric_db` with `npx prisma migrate deploy`. It was applied only to the test database here.
+- **DEC-02 (done):** public registration is closed. Institutes are now provisioned by a SUPER_ADMIN (DEC-01). The invite still needs the admin to accept it. An invite's `name` is validated but not stored, because `User` has no name column. A `STUDENT` invite creates a `User` with no `Student` link, which DEC-03 leaves open. The invite expiry is capped at 30 days, and there is no password policy yet. Deploy the migration `20261126120000_add_user_invites` to `psychometric_db` with `npx prisma migrate deploy`. It was applied only to the test database here.
+- **DEC-01 (done):** the first SUPER_ADMIN account is not created by any API. Tests create it with Prisma. Choose a bootstrap method (seed or an operator command). Apply the two DEC-01 migrations to `psychometric_db` with `npx prisma migrate deploy`. They are applied to the test database only so far.
 - **DEC-03 (done):** candidates are identified by their `TestInvite` token alone. Student self-service reports are not offered, and linking a `Student` to a `User` is not done; either needs its own decision. There is no `GET /api/v1/tests/{id}` route. A candidate reads their test through `POST /api/v1/invites/assessment`.
 - **Invite tokens at rest:** tokens are still stored in plaintext. Hashing needs a migration and a decision on how existing invites are handled.
 - **API documentation in production:** `/api-docs` is served whenever the app runs. Decide whether it is disabled in production.
@@ -931,9 +952,9 @@ Counts from the last run on this branch. Run them as described in `docs/INTEGRAT
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 29 of 29 suites, **378 of 378 tests passed** |
-| Integration (active) | `npm run test:integration` | 15 of 15 suites, **277 of 277 tests passed** |
-| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03, DEC-02, DEC-03 and DEC-04 needed none |
+| Unit | `npm test` | 29 of 29 suites, **385 of 385 tests passed** |
+| Integration (active) | `npm run test:integration` | 16 of 16 suites, **303 of 303 tests passed** |
+| Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03, DEC-01, DEC-02, DEC-03 and DEC-04 needed none |
 
 ---
 

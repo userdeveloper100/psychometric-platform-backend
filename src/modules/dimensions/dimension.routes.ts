@@ -10,7 +10,7 @@ const router = Router();
  * /api/v1/dimensions:
  *   get:
  *     summary: Get all dimensions
- *     description: Fetch all active dimensions with optional pagination. ADMIN role required.
+ *     description: Fetch all active dimensions with optional pagination. ADMIN, RECRUITER or EVALUATOR role required.
  *     tags: [Dimensions]
  *     security:
  *       - BearerAuth: []
@@ -36,7 +36,7 @@ const router = Router();
 router.get(
     '/',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     dimensionController.getAllDimensions
 );
 
@@ -45,7 +45,7 @@ router.get(
  * /api/v1/dimensions/tests/{testId}/dimensions:
  *   get:
  *     summary: Get dimensions by test
- *     description: Fetch all dimensions for a given psychometric test. ADMIN role required.
+ *     description: Fetch all dimensions for a given psychometric test. ADMIN, RECRUITER or EVALUATOR role required.
  *     tags: [Dimensions]
  *     security:
  *       - BearerAuth: []
@@ -168,7 +168,7 @@ router.get(
 router.get(
     '/tests/:testId/dimensions',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     dimensionController.getTestDimensions
 );
 

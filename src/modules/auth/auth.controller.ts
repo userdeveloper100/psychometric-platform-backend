@@ -17,7 +17,8 @@ import {
 import { logSecurityEvent } from '../../utils/security-logger';
 import { USER_INVITE_REFUSAL } from './auth.service';
 
-const INVITE_ROLES: readonly string[] = ['ADMIN', 'STUDENT'];
+// DEC-01: staff and candidate roles an ADMIN may invite. SUPER_ADMIN is never invitable (checked first, below).
+const INVITE_ROLES: readonly string[] = ['ADMIN', 'RECRUITER', 'EVALUATOR', 'STUDENT'];
 const DEFAULT_INVITE_DAYS = 7;
 const MAX_INVITE_DAYS = 30;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -128,8 +129,19 @@ export const createUserInvite = async (req: Request, res: Response): Promise<Res
         if (typeof email !== 'string' || !EMAIL_SHAPE.test(email.trim())) {
             return badRequestResponse(res, 'A valid email is required');
         }
+        // DEC-01: privilege escalation is refused before any other check. Only SUPER_ADMIN provisioning creates that role.
+        if (role === 'SUPER_ADMIN') {
+            logSecurityEvent('authorization_denied', {
+                userId: authReq.user?.userId,
+                instituteId,
+                role: authReq.user?.role,
+                action: 'POST /api/v1/auth/invites',
+                reason: 'privilege_escalation_blocked',
+            });
+            return forbiddenResponse(res, 'SUPER_ADMIN accounts cannot be invited');
+        }
         if (typeof role !== 'string' || !INVITE_ROLES.includes(role)) {
-            return badRequestResponse(res, 'role must be ADMIN or STUDENT');
+            return badRequestResponse(res, 'role must be ADMIN, RECRUITER, EVALUATOR or STUDENT');
         }
         const expiry = resolveInviteExpiry(expiresAt, new Date());
         if (!expiry) {
@@ -138,7 +150,7 @@ export const createUserInvite = async (req: Request, res: Response): Promise<Res
 
         const { invite, token } = await authService.createUserInvite({
             email: email.trim(),
-            role: role as 'ADMIN' | 'STUDENT',
+            role: role as 'ADMIN' | 'RECRUITER' | 'EVALUATOR' | 'STUDENT',
             expiresAt: expiry,
             instituteId,
             createdBy: authReq.user!.userId,

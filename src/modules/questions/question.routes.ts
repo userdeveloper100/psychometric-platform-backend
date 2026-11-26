@@ -10,7 +10,7 @@ const router = Router();
  * /api/v1/questions:
  *   get:
  *     summary: Get all questions
- *     description: Fetch all active questions with optional pagination. ADMIN role required.
+ *     description: Fetch all active questions with optional pagination. ADMIN, RECRUITER or EVALUATOR role required.
  *     tags: [Questions]
  *     security:
  *       - BearerAuth: []
@@ -36,11 +36,11 @@ const router = Router();
 router.get(
     '/',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     questionController.getAllQuestions
 );
 
-// ADMIN only. Candidates read their questions through POST /api/v1/invites/assessment (DEC-03).
+// ADMIN, RECRUITER and EVALUATOR read. Candidates read their questions through POST /api/v1/invites/assessment (DEC-03).
 /**
  * @swagger
  * /api/v1/questions/dimensions/{dimensionId}/questions:
@@ -84,7 +84,7 @@ router.get(
 router.get(
     '/dimensions/:dimensionId/questions',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     questionController.getDimensionQuestions
 );
 

@@ -5,7 +5,7 @@ import { authorizeRoles } from '../../middleware/role.middleware';
 
 const router = Router();
 
-// Only ADMIN can access reports
+// ADMIN, RECRUITER and EVALUATOR can read reports, each only within its own institute
 /**
  * @swagger
  * /api/v1/reports:
@@ -37,7 +37,7 @@ const router = Router();
 router.get(
     '/',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     reportController.getAllReports
 );
 
@@ -91,7 +91,7 @@ router.get(
 router.get(
     '/student/:studentId/test/:testId',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     reportController.getStudentReport
 );
 
@@ -138,7 +138,7 @@ router.get(
 router.get(
     '/test/:testId',
     authenticateJWT,
-    authorizeRoles('ADMIN'),
+    authorizeRoles('ADMIN', 'RECRUITER', 'EVALUATOR'),
     reportController.getTestReport
 );
 
