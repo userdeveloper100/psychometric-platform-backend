@@ -608,6 +608,7 @@ Every module is served under `/api/v1/<resource>` (`DEC-04`). The unversioned `/
 | Responses | DELETE | `/api/v1/responses/{id}` | ADMIN |
 | Reports | GET | `/api/v1/reports` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Reports | GET | `/api/v1/reports/test/{testId}` | ADMIN, RECRUITER, EVALUATOR (own institute) |
+| Reports | GET | `/api/v1/reports/test/{testId}/export?format=csv` | ADMIN, RECRUITER, EVALUATOR (own institute). CSV download, other formats 400 |
 | Reports | GET | `/api/v1/reports/student/{studentId}/test/{testId}` | ADMIN, RECRUITER, EVALUATOR (own institute) |
 | Health | GET | `/health` | Public |
 
@@ -946,14 +947,26 @@ The tracker records these security items as done: SEC-01, SEC-02, SEC-03, SEC-05
 - **API documentation in production:** `/api-docs` is served whenever the app runs. Decide whether it is disabled in production.
 - **Unrouted code, not tenant scoped:** `getInstitutes` in `institute.service.ts` (search across all institutes) has no route. Its query is not scoped to the requester, so it must be removed or scoped before anyone routes it. This is the one known exception to the release-gate rule that tenant lookups are scoped.
 
+## Phase 1 Enterprise SaaS Modules
+
+Tracker for the enterprise recruiting modules that sit on top of the completed decisions.
+
+| Module | Status | What it does | Commit |
+|---|---|---|---|
+| Psychometric Scoring & Analytics Engine | `DONE` | Pure, deterministic scoring in `src/modules/reports/scoring.engine.ts`. Each dimension gets a normalized 0..100 score from its questions' own scales. A composite is the weighted mean of those scores. Each completed candidate gets a midrank percentile and a band (LOW, BELOW_AVERAGE, AVERAGE, ABOVE_AVERAGE, HIGH) against the completed candidates of the same test and institute only. The test report adds cohort statistics (count, mean, median, population standard deviation, min, max) and per-dimension averages. New `GET /api/v1/reports/test/{testId}/export?format=csv` returns a CSV with RFC 4180 quoting and formula-injection protection, for ADMIN, RECRUITER and EVALUATOR of the own institute. The schema has no dimension weight, so the composite is equal-weighted, and the schema is unchanged. | `feat: add psychometric scoring engine and csv report export` |
+
+**Formulas.** Normalized answer = (answer − scaleMin) / (scaleMax − scaleMin) × 100, clamped to 0..100. A scale with no range gives no score, never NaN. Composite = Σ(wᵢ·sᵢ) / Σwᵢ, which is the plain mean when no weights are set. Percentile = (below + 0.5 × equal) / n × 100. Bands: below 20 LOW, 20 to 40 BELOW_AVERAGE, 40 to 60 AVERAGE, 60 to 80 ABOVE_AVERAGE, 80 and up HIGH. Population standard deviation (divide by n).
+
+---
+
 ## Current Test Baseline
 
 Counts from the last run on this branch. Run them as described in `docs/INTEGRATION_TESTING.md`.
 
 | Suite | Command | Result |
 |---|---|---|
-| Unit | `npm test` | 29 of 29 suites, **385 of 385 tests passed** |
-| Integration (active) | `npm run test:integration` | 16 of 16 suites, **303 of 303 tests passed** |
+| Unit | `npm test` | 31 of 31 suites, **451 of 451 tests passed** |
+| Integration (active) | `npm run test:integration` | 17 of 17 suites, **314 of 314 tests passed** |
 | Pending regressions | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests`. DB-02, DB-03, DEC-01, DEC-02, DEC-03 and DEC-04 needed none |
 
 ---

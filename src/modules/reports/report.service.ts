@@ -1,24 +1,50 @@
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
+import {
+    cohortStatistics,
+    CohortStatistics,
+    dimensionNormalizedScore,
+    dimensionRawScore,
+    percentileRank,
+    performanceBand,
+    PerformanceBand,
+    round2,
+    weightedComposite,
+} from './scoring.engine';
+
+type ReportStatus = 'PENDING' | 'COMPLETED' | null;
 
 type DimensionScore = {
     dimensionId: string;
     dimensionName: string;
+    /** Raw mean of the answers, as before the scoring engine. Kept for existing clients. */
     score: number;
+    /** Mean of the answers normalized to 0..100 against each question's scale. Null when nothing can be normalized. */
+    normalizedScore: number | null;
 };
 
-type StudentReport = {
+type ScoredStudent = {
+    dimensions: DimensionScore[];
+    compositeScore: number | null;
+    percentileRank: number | null;
+    performanceBand: PerformanceBand | null;
+};
+
+type StudentReport = ScoredStudent & {
     studentId: string;
     testId: string;
-    dimensions: DimensionScore[];
+    status: ReportStatus;
 };
 
 type TestReport = {
     testId: string;
-    students: Array<{
-        studentId: string;
-        dimensions: DimensionScore[];
-    }>;
+    cohort: {
+        invitedCount: number;
+        completedCount: number;
+        compositeStatistics: CohortStatistics | null;
+        dimensionAverages: Array<{ dimensionId: string; dimensionName: string; averageNormalizedScore: number | null }>;
+    };
+    students: Array<ScoredStudent & { studentId: string; studentName: string; status: ReportStatus }>;
 };
 
 interface GetAllReportsOptions {
@@ -33,12 +59,32 @@ const requireInstitute = (instituteId: string | undefined): string => {
     return instituteId;
 };
 
+interface ScoringDimension {
+    id: string;
+    name: string;
+    questions: Array<{ id: string; scaleMin: number; scaleMax: number }>;
+}
+
+interface ScoringContext {
+    dimensions: ScoringDimension[];
+    /** Students invited to the test, in the institute, with the invite status. */
+    invites: Array<{ studentId: string; studentName: string; status: 'PENDING' | 'COMPLETED' }>;
+    /** Active answers per student for the active questions of the test. */
+    answers: Map<string, Array<{ questionId: string; answer: number }>>;
+}
+
 /**
- * Scores one student on one test. Only active dimensions, active questions and active responses count.
- * Callers must have already checked that the student and the test belong to the institute.
+ * Loads everything the scores need for one test in a fixed number of queries. Only active test, dimensions,
+ * questions, invites, students and responses count. The test must be active and in the institute.
+ * `extraStudentIds` adds students that are scored but not listed (the student report).
  */
-const buildStudentScores = async (studentId: string, testId: string): Promise<DimensionScore[]> => {
-    // 1,2) Active dimensions and active questions of the test
+const loadScoringContext = async (testId: string, scope: string, extraStudentIds: string[] = []): Promise<ScoringContext> => {
+    const test = await prisma.psychometricTest.findFirst({
+        where: { id: testId, instituteId: scope, isActive: true },
+        select: { id: true }
+    });
+    if (!test) throw new Error('Test not found');
+
     const dimensions = await prisma.dimension.findMany({
         where: { testId, isActive: true },
         select: {
@@ -46,49 +92,123 @@ const buildStudentScores = async (studentId: string, testId: string): Promise<Di
             name: true,
             questions: {
                 where: { isActive: true },
-                select: { id: true }
+                select: { id: true, scaleMin: true, scaleMax: true }
             }
         }
     });
-
     const questionIds = dimensions.flatMap((d) => d.questions.map((q) => q.id));
 
-    // 3) Active responses of the student for those questions
-    const responses = questionIds.length
+    const invites = await prisma.testInvite.findMany({
+        where: {
+            testId,
+            isActive: true,
+            student: { instituteId: scope, isActive: true }
+        },
+        select: {
+            studentId: true,
+            status: true,
+            student: { select: { name: true } }
+        }
+    });
+
+    const studentIds = [...new Set([...invites.map((i) => i.studentId), ...extraStudentIds])];
+    const responses = studentIds.length && questionIds.length
         ? await prisma.response.findMany({
             where: {
-                studentId,
+                studentId: { in: studentIds },
                 isActive: true,
                 questionId: { in: questionIds }
             },
-            select: {
-                questionId: true,
-                answer: true
-            }
+            select: { studentId: true, questionId: true, answer: true }
         })
         : [];
 
-    // 4,5) Map to dimensions and calculate averages
-    return dimensions.map((dimension) => {
-        const dimQuestionIds = new Set(dimension.questions.map((q) => q.id));
-        const dimResponses = responses.filter((r) => dimQuestionIds.has(r.questionId));
+    const answers = new Map<string, Array<{ questionId: string; answer: number }>>();
+    for (const r of responses) {
+        const list = answers.get(r.studentId) ?? [];
+        list.push({ questionId: r.questionId, answer: Number(r.answer) });
+        answers.set(r.studentId, list);
+    }
 
-        const score =
-            dimResponses.length > 0
-                ? Number(
-                    (
-                        dimResponses.reduce((sum, r) => sum + Number(r.answer), 0) /
-                        dimResponses.length
-                    ).toFixed(2)
-                )
-                : 0;
+    return {
+        dimensions,
+        invites: invites.map((i) => ({
+            studentId: i.studentId,
+            studentName: i.student.name,
+            status: i.status
+        })),
+        answers
+    };
+};
 
+/** Scores one student from the context. Equal weights, because the schema has no dimension weight. */
+const scoreStudent = (ctx: ScoringContext, studentId: string): Omit<ScoredStudent, 'percentileRank' | 'performanceBand'> => {
+    const rows = ctx.answers.get(studentId) ?? [];
+    const dimensions: DimensionScore[] = ctx.dimensions.map((dimension) => {
+        const scaleByQuestion = new Map(dimension.questions.map((q) => [q.id, q]));
+        const dimRows = rows.filter((r) => scaleByQuestion.has(r.questionId));
+        const normalizedScore = dimensionNormalizedScore(
+            dimRows.map((r) => {
+                const q = scaleByQuestion.get(r.questionId)!;
+                return { answer: r.answer, scaleMin: q.scaleMin, scaleMax: q.scaleMax };
+            })
+        );
         return {
             dimensionId: dimension.id,
             dimensionName: dimension.name,
-            score
+            score: dimensionRawScore(dimRows.map((r) => r.answer)),
+            normalizedScore
         };
     });
+
+    return {
+        dimensions,
+        compositeScore: weightedComposite(dimensions.map((d) => ({ score: d.normalizedScore })))
+    };
+};
+
+/**
+ * Scores every student in the context, then ranks each completed candidate against the completed cohort of the same
+ * test and institute. A pending candidate has no percentile. The cohort never includes another institute.
+ */
+const analyse = (ctx: ScoringContext, studentIds: string[]) => {
+    const statusOf = new Map(ctx.invites.map((i) => [i.studentId, i.status as ReportStatus]));
+    const scored = new Map(studentIds.map((id) => [id, scoreStudent(ctx, id)]));
+
+    const completedIds = ctx.invites.filter((i) => i.status === 'COMPLETED').map((i) => i.studentId);
+    const cohortComposites = completedIds
+        .map((id) => scored.get(id)?.compositeScore)
+        .filter((v): v is number => typeof v === 'number');
+
+    const withRank = (id: string): ScoredStudent & { status: ReportStatus } => {
+        const s = scored.get(id)!;
+        const status = statusOf.get(id) ?? null;
+        const pct = status === 'COMPLETED' && s.compositeScore !== null
+            ? percentileRank(s.compositeScore, cohortComposites)
+            : null;
+        return { ...s, percentileRank: pct, performanceBand: performanceBand(pct), status };
+    };
+
+    const cohortDimensionAverages = ctx.dimensions.map((dimension, index) => {
+        const values = completedIds
+            .map((id) => scored.get(id)?.dimensions[index]?.normalizedScore)
+            .filter((v): v is number => typeof v === 'number');
+        return {
+            dimensionId: dimension.id,
+            dimensionName: dimension.name,
+            averageNormalizedScore: values.length ? round2(values.reduce((s, v) => s + v, 0) / values.length) : null
+        };
+    });
+
+    return {
+        withRank,
+        cohort: {
+            invitedCount: ctx.invites.length,
+            completedCount: completedIds.length,
+            compositeStatistics: cohortStatistics(cohortComposites),
+            dimensionAverages: cohortDimensionAverages
+        }
+    };
 };
 
 /**
@@ -111,17 +231,11 @@ export const getStudentReport = async (
         });
         if (!student) throw new Error('Student not found');
 
-        const test = await prisma.psychometricTest.findFirst({
-            where: { id: testId, instituteId: scope, isActive: true },
-            select: { id: true }
-        });
-        if (!test) throw new Error('Test not found');
+        const ctx = await loadScoringContext(testId, scope, [studentId]);
+        const { withRank } = analyse(ctx, [...new Set([...ctx.invites.map((i) => i.studentId), studentId])]);
+        const own = withRank(studentId);
 
-        return {
-            studentId,
-            testId,
-            dimensions: await buildStudentScores(studentId, testId)
-        };
+        return { studentId, testId, ...own };
     } catch (error) {
         logger.error('Failed to generate student report', {
             studentId,
@@ -132,43 +246,26 @@ export const getStudentReport = async (
     }
 };
 
-/** SEC-10: the test must be active and in the institute. Only active students of the institute are included. */
+/**
+ * SEC-10: the test must be active and in the institute. Only active students of the institute are included.
+ */
 export const getTestReport = async (testId: string, instituteId: string): Promise<TestReport> => {
     if (!testId) throw new Error('testId is required');
     const scope = requireInstitute(instituteId);
 
     try {
-        const test = await prisma.psychometricTest.findFirst({
-            where: { id: testId, instituteId: scope, isActive: true },
-            select: { id: true }
-        });
-        if (!test) throw new Error('Test not found');
+        const ctx = await loadScoringContext(testId, scope);
+        const invitedIds = ctx.invites.map((i) => i.studentId);
+        const { withRank, cohort } = analyse(ctx, invitedIds);
 
-        // 1) Students invited to this test, limited to active students of the institute
-        const invites = await prisma.testInvite.findMany({
-            where: {
-                testId,
-                isActive: true,
-                student: { instituteId: scope, isActive: true }
-            },
-            select: {
-                studentId: true
-            },
-            distinct: ['studentId']
-        });
-
-        // 2) Score each student with the same rules as the student report
-        const students = await Promise.all(
-            invites.map(async (invite) => ({
-                studentId: invite.studentId,
-                dimensions: await buildStudentScores(invite.studentId, testId)
-            }))
-        );
-
-        // 3) Return aggregated report
         return {
             testId,
-            students
+            cohort,
+            students: ctx.invites.map((invite) => ({
+                studentId: invite.studentId,
+                studentName: invite.studentName,
+                ...withRank(invite.studentId)
+            }))
         };
     } catch (error) {
         logger.error('Failed to generate test report', {

@@ -71,7 +71,7 @@ describe('SEC-10: accurate, scoped report data for own institute', () => {
         const res = await testReport(fx.a.test.id, fx.a.adminToken);
         expect(studentIds(res)).toEqual([fx.a.student.id]);
         expect(res.body.data.students[0].dimensions).toEqual([
-            { dimensionId: fx.a.dimension.id, dimensionName: fx.a.dimension.name, score: 3 },
+            expect.objectContaining({ dimensionId: fx.a.dimension.id, dimensionName: fx.a.dimension.name, score: 3 }),
         ]);
     });
 

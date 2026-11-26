@@ -157,3 +157,76 @@ describe('report.controller', () => {
         });
     });
 });
+
+describe('report.controller export (CSV, scoring engine)', () => {
+    const report = {
+        testId: 't1',
+        cohort: { invitedCount: 1, completedCount: 1, compositeStatistics: null, dimensionAverages: [{ dimensionId: 'd1', dimensionName: 'Openness', averageNormalizedScore: 75 }] },
+        students: [
+            {
+                studentId: 's1',
+                studentName: 'Ann',
+                status: 'COMPLETED',
+                compositeScore: 75,
+                percentileRank: 50,
+                performanceBand: 'AVERAGE',
+                dimensions: [{ dimensionId: 'd1', dimensionName: 'Openness', score: 4, normalizedScore: 75 }],
+            },
+        ],
+    };
+
+    test('200 with text/csv, an attachment header, and the CSV body', async () => {
+        svc.getTestReport.mockResolvedValue(report as any);
+        const req = mockRequest({ params: { testId: 't1' }, query: { format: 'csv' }, user: adminA });
+        const res = mockResponse();
+
+        await reportController.exportTestReportCsv(req, res);
+
+        expect(statusCode(res)).toBe(200);
+        expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv; charset=utf-8');
+        expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="test-report-t1.csv"');
+        const body = (res.send as unknown as jest.Mock).mock.calls[0][0];
+        expect(body.split('\r\n')[1]).toBe('s1,Ann,COMPLETED,75,50,AVERAGE,75');
+        expect(svc.getTestReport).toHaveBeenCalledWith('t1', 'institute-a');
+    });
+
+    test('the scope is the token institute, and a query instituteId is ignored', async () => {
+        svc.getTestReport.mockResolvedValue(report as any);
+        const req = mockRequest({ params: { testId: 't1' }, query: { format: 'csv', instituteId: spoof }, user: adminA });
+        const res = mockResponse();
+
+        await reportController.exportTestReportCsv(req, res);
+
+        expect(svc.getTestReport).toHaveBeenCalledWith('t1', 'institute-a');
+    });
+
+    test('400 when format is missing or not csv, with no service call', async () => {
+        for (const query of [{}, { format: 'json' }, { format: ['csv', 'csv'] }]) {
+            const res = mockResponse();
+            await reportController.exportTestReportCsv(mockRequest({ params: { testId: 't1' }, query, user: adminA }), res);
+            expect(statusCode(res)).toBe(400);
+        }
+        expect(svc.getTestReport).not.toHaveBeenCalled();
+    });
+
+    test('404 for a foreign or inactive test, with no CSV', async () => {
+        svc.getTestReport.mockRejectedValue(new Error('Test not found'));
+        const req = mockRequest({ params: { testId: 'foreign' }, query: { format: 'csv' }, user: adminA });
+        const res = mockResponse();
+
+        await reportController.exportTestReportCsv(req, res);
+
+        expect(statusCode(res)).toBe(404);
+        expect(res.send).not.toHaveBeenCalled();
+    });
+
+    test('403 when the token has no institute', async () => {
+        svc.getTestReport.mockRejectedValue(new Error('Institute scope is required'));
+        const req = mockRequest({ params: { testId: 't1' }, query: { format: 'csv' }, user: { userId: 'u1', role: 'ADMIN', instituteId: '' } });
+        const res = mockResponse();
+
+        await reportController.exportTestReportCsv(req, res);
+
+        expect(statusCode(res)).toBe(403);
+    });
+});

@@ -1,6 +1,6 @@
 # Integration Testing
 
-**Status as of 2026-11-26 (DEC-01):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) and invitation-only onboarding (DEC-02) and the SaaS role hierarchy (DEC-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
+**Status as of 2026-11-26 (scoring engine):** harness in place. Integration tests run against an isolated test database. Fixed findings (SEC-01, SEC-02, SEC-03, SEC-05, SEC-06, SEC-07, SEC-10), the soft-delete cascade defect (DB-01), student re-invitation (DB-02), response integrity (DB-03) and the Step 12 release gate (structured security logging, tenant-scoped lists, route-level role checks, safe error responses) the standardized `/api/v1` routes (DEC-04) and the token-bound candidate flow (DEC-03) and invitation-only onboarding (DEC-02) and the SaaS role hierarchy (DEC-01) are promoted to active suites. No pending tests remain. The pending suite is empty, so its script passes with no tests (see section 8).
 
 Related documents: `IMPLEMENTATION_AUDIT.md` (findings and IDs), `FUTURE_IMPLEMENTATION_CHECKLIST.md` (fix tasks), `API_IMPLEMENTATION_MATRIX.md` (endpoints).
 
@@ -158,15 +158,15 @@ Run on 2026-11-26 against `psychometric_test`:
 
 | Suite | Result |
 |---|---|
-| `npm test` (unit, 29 suites) | 29 of 29 suites, **385 of 385 tests passed** |
-| `npm run test:integration` | 16 of 16 suites, **303 of 303 tests passed** |
+| `npm test` (unit, 31 suites) | 31 of 31 suites, **451 of 451 tests passed** |
+| `npm run test:integration` | 17 of 17 suites, **314 of 314 tests passed** |
 | `npm run test:integration:pending` | **No pending tests remain.** The script exits 0 with `--passWithNoTests` (see section 8) |
 | `npm run build` | Passed, exit 0 |
 | `npx prisma validate` | Schema valid |
 | `prisma migrate status`, test database | 3 migrations found, schema up to date |
 | `prisma migrate status`, development database (read only) | 3 migrations found, schema up to date |
 
-### 7.1 Passing integration tests (303)
+### 7.1 Passing integration tests (314)
 
 **`infrastructure.integration.spec.ts` (9):** guard accepts the test database; refuses a missing URL; refuses the development database name; refuses a non-matching name; refuses a remote host; refuses a non-PostgreSQL scheme; error messages do not contain the connection string; the live connection is the guarded database with migrations applied; cleanup removes rows.
 
@@ -191,6 +191,8 @@ Run on 2026-11-26 against `psychometric_test`:
 **`response-integrity.integration.spec.ts` (17):** DB-03 regression tests. A valid submission creates responses for the invite's student and marks the invite COMPLETED in one transaction (201). Extra body values (`instituteId`, `testId`, a different `studentId`) do not move a response: the invite decides, and a mismatched `studentId` is refused (400). A question from another test of the same institute, from a test of another institute, a deactivated question, a question under an inactive dimension, and a question of an inactive test are each refused (400) with zero rows written and the invite still open. A payload that mixes a valid and a foreign question writes nothing. Duplicate `questionId` entries, an empty array, a non-array `responses`, a string or fractional answer, and an out-of-scale answer are refused (400) with zero rows. A re-submission for a completed invite is refused (400). Two concurrent submissions for one invite produce exactly one 201 and one 400, with one stored row. A deactivated student's invite is refused with the generic message, and the token is not echoed.
 
 **`release-gate.integration.spec.ts` (15):** Step 12 regression tests. `GET /api/v1/tests` returns only the requester's institute, and a query `instituteId` cannot widen it. A token with no institute gets 403. A STUDENT gets 403 on test create, publish and delete, and nothing changes. `GET /api/v1/auth/users` lists only the requester's institute users, is ADMIN-only (STUDENT 403, no token 401). The security log is checked end to end: an invalid token writes `auth_failed` and the token is not in any logged entry. A denied STUDENT writes `authorization_denied` with the route template. Publishing a test writes `sensitive_admin_action`. A foreign test writes a not-found-in-scope denial. A refused invite writes `invite_validation_failed` with the fixed reason, and neither the submitted token nor a valid invite token is logged.
+
+**`scoring-analytics.integration.spec.ts` (11):** Scoring engine regression tests. Institute A's cohort statistics come from its completed candidates only (mean 50, median 50, population standard deviation 40.82), and each candidate has its midrank percentile and band. The pending candidate has none. Institute B's extreme completed candidates never change A's numbers, and the reverse holds too. The CSV export is valid for ADMIN, RECRUITER and EVALUATOR of the institute, with the attachment header. It is 403 for a STUDENT and 401 without a token. Institute B gets 404 for A's test, and an inactive test gets 404. A request without `format=csv` is 400. A formula-like candidate name is neutralised. The export is logged as a sensitive admin action, without names.
 
 **`saas-roles.integration.spec.ts` (26):** DEC-01 regression tests. SUPER_ADMIN provisions an institute with its first ADMIN invite (201), and the raw token is shown once. The invited admin accepts it, logs in, and manages the new institute. A tenant ADMIN gets 403 on institute creation and on a SUPER_ADMIN invite. A RECRUITER manages candidates and test invites and reads tests and reports in its own institute, and gets 403 on writes, responses and staff invites. An EVALUATOR reads tests, responses and reports, and gets 403 on every write, invite and institute operation. Foreign institute resources return 404. A SUPER_ADMIN gets 403 on tenant routes, and a non-SUPER_ADMIN token with no institute gets 403.
 
@@ -308,6 +310,20 @@ The permission matrix is the one in the README (API Versioning section). It is e
 
 Covered by `saas-roles.integration.spec.ts`, by the updated `institute-security.integration.spec.ts`, and by the unit tests in `institute.controller.spec.ts` and `auth.controller.spec.ts`.
 
+### 8.8 Scoring and analytics engine
+
+The pure calculations live in `src/modules/reports/scoring.engine.ts`, with no database access, and are tested directly in `scoring.engine.spec.ts`. The report service loads the test, its active dimensions and questions, the invites of the institute and the active answers in a fixed set of queries, then scores every candidate from that one context.
+
+**Normalization.** Each answer maps to 0..100 with `(answer − scaleMin) / (scaleMax − scaleMin) × 100`, clamped. A question whose scale has no range (`scaleMax <= scaleMin`) is left out, so it never produces NaN or Infinity. A dimension with no usable answer has a normalized score of `null` and is not reported as zero. The existing `score` field stays the raw mean, so existing clients see no change.
+
+**Composite.** `sum(w × s) / sum(w)` over the dimensions that have a score. The schema has no dimension weight, so the composite is the plain mean. A missing, zero, negative or non-finite weight counts as zero, and if every weight is zero the mean is used. The weighted path is unit-tested, but the API cannot reach it until a weight column exists.
+
+**Percentile and band.** The midrank percentile is `(below + 0.5 × equal) / n × 100`, against the completed candidates of the same test and institute only. The candidate counts in its own cohort. A candidate whose invite is pending has no percentile or band. Bands: LOW below 20, BELOW_AVERAGE from 20, AVERAGE from 40, ABOVE_AVERAGE from 60, HIGH from 80.
+
+**Cohort statistics.** Count, mean, median, population standard deviation (divide by n), min and max, over completed candidates. Per-dimension averages are the mean normalized score of the completed candidates.
+
+**Export.** `GET /api/v1/reports/test/{testId}/export?format=csv` returns `text/csv` with `Content-Disposition: attachment`. It is the same scoped report as the JSON route. Cells that start with `= + - @`, a tab or a carriage return get an apostrophe, so a spreadsheet cannot run them. Values with a comma, a quote or a line break are quoted (RFC 4180). The export is logged as `sensitive_admin_action` with the test id. The names are not logged.
+
 ---
 
 ## 9. Known Limitations
@@ -318,6 +334,8 @@ Covered by `saas-roles.integration.spec.ts`, by the updated `institute-security.
 - **Single shared test database.** Suites are isolated by truncation, not by separate schemas.
 - **Student identity is not modelled as an account.** `Student` has no link to `User`, and DEC-03 identifies a candidate by the invite token instead. A test for "a student reads their own data" needs a new decision that adds an account link.
 - **First SUPER_ADMIN is not created by any API.** `POST /api/v1/institutes` (DEC-01) provisions tenants, but the platform's first SUPER_ADMIN account is created outside the API. Tests create it with Prisma in `harness.ts`. How production creates it is an open decision.
+- **No dimension weights.** `Dimension` has no weight column, so the composite is equal-weighted. Adding weights needs a schema decision. Until then the weighted formula is only available to code that calls `weightedComposite` directly.
+- **Cohorts are per test and institute.** A percentile is not compared with other institutes or with published norms, by design (tenant isolation).
 - **No load or timing tests.** Report performance (N+1 queries) is not measured.
 - **Swagger is not tested.** Path drift is documented in `API_IMPLEMENTATION_MATRIX.md` but not asserted.
 - **Console noise.** The app logs every request's business events and error details to the console during tests.

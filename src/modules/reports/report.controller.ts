@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import * as reportService from './report.service';
+import { buildTestReportCsv } from './report.csv';
+import { logSecurityEvent } from '../../utils/security-logger';
 import {
     successResponse,
     badRequestResponse,
@@ -88,5 +90,45 @@ export const getStudentReport = async (req: Request, res: Response): Promise<Res
         return successResponse(res, report, 'Student report generated successfully');
     } catch (error: any) {
         return handleReportError(res, error, 'Failed to generate student report');
+    }
+};
+
+/**
+ * GET /reports/test/:testId/export?format=csv
+ * Same scope as the JSON test report: the tenant comes only from the token, and a foreign or inactive test is 404.
+ * The export contains student names, so it is logged as a sensitive admin action (the log holds ids and the action only).
+ */
+export const exportTestReportCsv = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const { testId } = req.params;
+        const format = req.query.format;
+
+        if (!testId) {
+            return badRequestResponse(res, 'Test ID is required');
+        }
+        if (format !== 'csv') {
+            return badRequestResponse(res, 'format must be csv');
+        }
+
+        const instituteId = getRequesterInstituteId(req);
+        const report = await reportService.getTestReport(testId, instituteId);
+        const user = (req as any).user;
+
+        logSecurityEvent('sensitive_admin_action', {
+            userId: user?.userId,
+            instituteId,
+            role: user?.role,
+            action: 'export_test_report',
+            resourceType: 'test',
+            resourceId: testId,
+        });
+
+        // testId matched an active test of the caller's institute. It is still reduced to safe characters for the header.
+        const safeName = testId.replace(/[^A-Za-z0-9-]/g, '');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="test-report-${safeName}.csv"`);
+        return res.status(200).send(buildTestReportCsv(report));
+    } catch (error: any) {
+        return handleReportError(res, error, 'Failed to export test report');
     }
 };
